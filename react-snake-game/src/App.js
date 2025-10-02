@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
+import translations from './translations';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const GRID_SIZE = 24;
 const CANVAS_WIDTH = 900;
@@ -99,6 +101,10 @@ const generateWormsForQuestion = (question, snake) => {
 };
 
 function App() {
+  // Language state
+  const [language, setLanguage] = useState('en');
+  const t = translations[language];
+  
   // Login state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
@@ -542,9 +548,14 @@ function App() {
         alignItems: 'center', 
         minHeight: '100vh' 
       }}>
+        <LanguageSwitcher 
+          currentLanguage={language}
+          onLanguageChange={setLanguage}
+          translations={t}
+        />
         <form className="login-form" onSubmit={handleLogin}>
           <div style={{ fontSize: '2.5rem', marginBottom: '10px', textAlign: 'center' }}>🐍</div>
-          <h2 style={{ color: '#ffe082', textAlign: 'center', marginBottom: '10px' }}>Welcome!</h2>
+          <h2 style={{ color: '#ffe082', textAlign: 'center', marginBottom: '10px' }}>{t.loginWelcome}</h2>
           <div style={{ 
             color: '#81ff81', 
             fontSize: '1.1rem', 
@@ -552,11 +563,11 @@ function App() {
             textAlign: 'center', 
             marginBottom: '20px' 
           }}>
-            Please enter your details to start playing:
+            {t.loginEnterDetails}
           </div>
           <input
             type="text"
-            placeholder="Nickname or Username"
+            placeholder={t.loginUsername}
             maxLength="30"
             required
             value={formData.username}
@@ -564,7 +575,7 @@ function App() {
           />
           <input
             type="text"
-            placeholder="First Name"
+            placeholder={t.loginFirstName}
             maxLength="30"
             required
             value={formData.firstname}
@@ -572,7 +583,7 @@ function App() {
           />
           <input
             type="text"
-            placeholder="Last Name"
+            placeholder={t.loginLastName}
             maxLength="30"
             required
             value={formData.lastname}
@@ -580,13 +591,13 @@ function App() {
           />
           <input
             type="email"
-            placeholder="Email"
+            placeholder={t.loginEmail}
             maxLength="80"
             required
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           />
-          <button type="submit">Play Now</button>
+          <button type="submit">{t.loginPlayButton}</button>
         </form>
       </div>
     );
@@ -594,6 +605,11 @@ function App() {
 
   return (
     <div className="App">
+      <LanguageSwitcher 
+        currentLanguage={language}
+        onLanguageChange={setLanguage}
+        translations={t}
+      />
       <div className="split-container">
         {/* Left Panel */}
         <div className="left-panel">
@@ -602,7 +618,7 @@ function App() {
             {currentQuestion ? (
               <div>
                 <div className={getAnimationClass()} style={{ marginBottom: '7px', fontSize: '1.15em' }}>
-                  <b>Q:</b> {currentQuestion.question}
+                  <b>{t.questionPrefix}</b> {currentQuestion.question}
                 </div>
                 <div className={`choices-row ${getAnimationClass()}`}>
                   {currentQuestion.options.map((option, i) => {
@@ -634,15 +650,15 @@ function App() {
             ) : (
               <div>
                 <div style={{ fontSize: '1.3em', marginBottom: '15px', fontWeight: 'bold', color: '#ffe082' }}>
-                  📚 How to Play
+                  {t.howToPlayTitle}
                 </div>
                 <div style={{ fontSize: '1.05em', color: '#b4eaff', lineHeight: '1.6' }}>
-                  🐍 Use <b>arrow keys</b> or <b>WASD</b> to control the snake<br /><br />
-                  🪱 Eat the worm with the <b style={{ color: '#81ff81' }}>correct answer</b> (A/B/C/D)<br /><br />
-                  ✅ Correct answer = grow longer and score points<br /><br />
-                  ❌ Wrong answer or hitting wall/self = game over<br /><br />
-                  🏆 Pass 50% to unlock next level<br /><br />
-                  Press <b>S</b> to start!
+                  {t.howToPlayInstructions.map((instruction, i) => (
+                    <React.Fragment key={i}>
+                      {instruction}
+                      {i < t.howToPlayInstructions.length - 1 && <><br /><br /></>}
+                    </React.Fragment>
+                  ))}
                 </div>
               </div>
             )}
@@ -652,8 +668,9 @@ function App() {
           {showNextLevel && (
             <div className="next-level-btn" style={{ display: 'block' }}>
               <div className="next-level-message">
-                🎉 <strong>Congratulations!</strong> You've passed over <strong>50%</strong> of the questions.
-                You're eligible to go to the next level.
+                {t.nextLevelCongrats}
+                {' '}
+                {t.nextLevelEligible}
                 <button
                   onClick={() => window.location.href = '/comp705-02/'}
                   style={{
@@ -669,7 +686,7 @@ function App() {
                     boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
                   }}
                 >
-                  ✅ Next Level
+                  {t.nextLevelButton}
                 </button>
               </div>
             </div>
@@ -684,7 +701,7 @@ function App() {
               color: '#ffe082', 
               letterSpacing: '1px' 
             }}>
-              🏆 Top Players Leaderboard
+              {t.leaderboardTitle}
             </div>
             <div style={{
               width: '100%',
@@ -709,17 +726,17 @@ function App() {
                 }}>
                   <thead>
                     <tr style={{ background: '#2c3b55' }}>
-                      <th style={{ color: '#ffe082', padding: '10px 6px 10px 0', textAlign: 'center', fontWeight: '700' }}>#</th>
-                      <th style={{ color: '#81ff81', textAlign: 'center', fontWeight: '700' }}>Name</th>
-                      <th style={{ color: '#60e8fe', textAlign: 'center', fontWeight: '700' }}>Level</th>
-                      <th style={{ color: '#ffd580', textAlign: 'center', fontWeight: '700' }}>Time (s)</th>
+                      <th style={{ color: '#ffe082', padding: '10px 6px 10px 0', textAlign: 'center', fontWeight: '700' }}>{t.leaderboardRank}</th>
+                      <th style={{ color: '#81ff81', textAlign: 'center', fontWeight: '700' }}>{t.leaderboardName}</th>
+                      <th style={{ color: '#60e8fe', textAlign: 'center', fontWeight: '700' }}>{t.leaderboardLevel}</th>
+                      <th style={{ color: '#ffd580', textAlign: 'center', fontWeight: '700' }}>{t.leaderboardTime}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {leaderboard.length === 0 ? (
                       <tr>
                         <td colSpan="4" style={{ color: '#aaa', padding: '24px 0', textAlign: 'center', fontSize: '1.13em' }}>
-                          No entries yet.
+                          {t.leaderboardEmpty}
                         </td>
                       </tr>
                     ) : (
@@ -763,7 +780,7 @@ function App() {
         <div className="right-panel">
           <div className="game-area">
             <div className="game-title">
-              🧑‍💻 Snake Quiz Game for{' '}
+              🧑‍💻 {t.gameTitle}{' '}
               <span style={{
                 background: 'linear-gradient(90deg, #00c853, #64dd17)',
                 WebkitBackgroundClip: 'text',
@@ -772,7 +789,7 @@ function App() {
               }}>
                 {username}
               </span>{' '}
-              at block{' '}
+              {t.gameAtBlock}{' '}
               <span style={{
                 background: 'linear-gradient(90deg, #ff4081, #7c4dff, #40c4ff)',
                 WebkitBackgroundClip: 'text',
@@ -784,7 +801,7 @@ function App() {
             </div>
 
             <div className="score">
-              Level: {level} | Time: {gameTime.toFixed(1)} s
+              {t.gameLevel} {level} | {t.gameTime} {gameTime.toFixed(1)} s
             </div>
 
             <canvas
@@ -797,22 +814,23 @@ function App() {
             {showSplash && (
               <div className="splash">
                 <div style={{ fontSize: '2.1rem', fontWeight: '600', marginBottom: '12px' }}>
-                  {isGameOver ? `Play again, ${username}?` : `Ready to play, ${username}?`}
+                  {isGameOver ? `${t.splashPlayAgain} ${username}?` : `${t.splashReady} ${username}?`}
                 </div>
                 <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>
-                  Press <b>S</b> to start the game!
+                  {t.splashStartPrompt}
                 </div>
                 <div style={{ fontSize: '1.05rem', marginBottom: '14px', color: '#ffe082' }}>
-                  This game block contains <span style={{ fontWeight: 'bold', color: '#81ff81' }}>
+                  {t.splashQuestionsInfo} <span style={{ fontWeight: 'bold', color: '#81ff81' }}>
                     {questions.length}
-                  </span> questions.
-                  Let's aim for at least <b>50%</b> correct!
+                  </span> {t.splashQuestionsCount}
+                  {' '}
+                  {t.splashAim}
                 </div>
                 <div className="hint">
-                  🪱 Eat the <span style={{ color: '#81ff81', fontWeight: 'bold' }}>correct answer</span> worm (A/B/C/D) to score points.<br />
-                  ❌ Hitting the wall or eating a wrong answer will end your run.<br /><br />
-                  🟢 Once you pass the 50% mark, you <b>may proceed</b> to the next set of questions (if available).<br /><br />
-                  🏆 Check the <b>Leaderboard</b> to see how you rank!
+                  {t.splashHintCorrect}<br />
+                  {t.splashHintWrong}<br /><br />
+                  {t.splashHint50Percent}<br /><br />
+                  {t.splashHintLeaderboard}
                 </div>
               </div>
             )}
@@ -822,7 +840,7 @@ function App() {
 
       <div className="footer-bar">
         <span>
-          Made by Minh Nguyen @ <span style={{ color: '#fff', textShadow: '0 0 4px #ea0029cc' }}>AUT</span>
+          {t.footerMadeBy} <span style={{ color: '#fff', textShadow: '0 0 4px #ea0029cc' }}>AUT</span>
         </span>
         {' | '}
         <a
@@ -831,7 +849,7 @@ function App() {
           rel="noopener noreferrer"
           style={{ color: '#ffe082', textDecoration: 'underline', fontWeight: 'bold' }}
         >
-          Admin: Edit Question Bank
+          {t.footerAdmin}
         </a>
       </div>
     </div>
