@@ -1,7 +1,7 @@
 body {
   min-height: 100vh;
   margin: 0;
-  background: linear-gradient(135deg, #283e51 0%, #485563 100%);
+  background: linear-gradient(135deg, #0a3d62 0%, #1e5f74 50%, #2d8ba3 100%);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   overflow: hidden;
 }
@@ -79,7 +79,7 @@ a, button, input, textarea, select, label {
 
 .question-panel {
   width: 100%;
-  background: #223a50;
+  background: #1a4d66;
   color: #fff;
   border-radius: 18px;
   padding: 28px 20px 24px 22px;
@@ -145,10 +145,10 @@ a, button, input, textarea, select, label {
 
 canvas {
   display: block;
-  background: radial-gradient(ellipse at 60% 30%, #1a232f 70%, #10121b 100%);
-  border: 8px solid #24243e;
+  background: radial-gradient(ellipse at 60% 30%, #1a3a4f 70%, #0d1f2d 100%);
+  border: 8px solid #2c5f7d;
   border-radius: 30px;
-  box-shadow: 0 20px 48px #0007, 0 4px 18px #27c9e6a0 inset;
+  box-shadow: 0 20px 48px #0007, 0 4px 18px #4da6c8a0 inset;
   margin: 0 auto;
   transition: box-shadow 0.25s;
 }
@@ -165,9 +165,9 @@ canvas {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(40,62,81,0.97);
+  background: rgba(26,77,102,0.97);
   border-radius: 35px;
-  box-shadow: 0 0 48px #0009, 0 4px 18px #2c3e50b2;
+  box-shadow: 0 0 48px #0009, 0 4px 18px #2c5f7db2;
   color: #fff;
   font-size: 1.6rem;
   text-align: center;
@@ -224,6 +224,10 @@ canvas {
   margin: 0 auto 18px auto;
 }
 
+#mainLeaderboard > div:first-child + div {
+  background: #1a4055 !important;
+}
+
 @keyframes flash {
   0%, 100% { background-color: #004d40; }
   50% { background-color: #00ffc3; }
@@ -275,7 +279,7 @@ canvas {
 }
 
 .login-form {
-  background: rgba(40,62,81,0.97);
+  background: rgba(26,77,102,0.97);
   min-width: 320px;
   max-width: 98vw;
   padding: 2rem;

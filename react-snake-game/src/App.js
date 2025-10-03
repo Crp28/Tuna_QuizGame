@@ -27,8 +27,9 @@ const setCookie = (name, value, days = 180) => {
 };
 
 const randomBrightColor = () => {
-  const hue = Math.floor(Math.random() * 360);
-  return `hsl(${hue}, 85%, 65%)`;
+  // Use aquatic color range: blues, teals, cyan
+  const hue = 170 + Math.floor(Math.random() * 50); // 170-220 for aquatic colors
+  return `hsl(${hue}, 75%, 55%)`;
 };
 
 const getRandomQuestion = (questions, usedQuestions) => {
@@ -203,7 +204,7 @@ function App() {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw worms
+    // Draw worms (now aquatic prey - crabs/fish)
     worms.forEach((worm, i) => {
       ctx.save();
       
@@ -214,18 +215,35 @@ function App() {
       const cx = worm.x + GRID_SIZE / 2 + dx;
       const cy = worm.y + GRID_SIZE / 2 + dy;
       
-      ctx.shadowColor = worm.color;
-      ctx.shadowBlur = 28;
+      // Draw aquatic prey with blue/teal tones
+      const aquaticColor = `hsl(${180 + (i * 20)}, 70%, 60%)`;
+      ctx.shadowColor = aquaticColor;
+      ctx.shadowBlur = 22;
       
+      // Draw as small fish/crab shape
       ctx.beginPath();
-      ctx.arc(cx, cy, GRID_SIZE / 1.85, 0, 2 * Math.PI);
-      ctx.fillStyle = worm.color;
+      // Body
+      ctx.ellipse(cx, cy, GRID_SIZE / 2.2, GRID_SIZE / 2.8, 0, 0, 2 * Math.PI);
+      ctx.fillStyle = aquaticColor;
       ctx.fill();
       
+      // Add small details for crab claws or fish fins
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.ellipse(cx - GRID_SIZE / 3.5, cy, GRID_SIZE / 6, GRID_SIZE / 8, -Math.PI / 6, 0, 2 * Math.PI);
+      ctx.fillStyle = aquaticColor;
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.ellipse(cx + GRID_SIZE / 3.5, cy, GRID_SIZE / 6, GRID_SIZE / 8, Math.PI / 6, 0, 2 * Math.PI);
+      ctx.fillStyle = aquaticColor;
+      ctx.fill();
+      
+      // Draw letter label
       ctx.shadowColor = "#fff";
-      ctx.shadowBlur = 22;
-      ctx.globalAlpha = 0.92;
-      ctx.font = `bold ${Math.floor(GRID_SIZE * 1.0)}px Segoe UI, Arial`;
+      ctx.shadowBlur = 18;
+      ctx.globalAlpha = 0.95;
+      ctx.font = `bold ${Math.floor(GRID_SIZE * 0.95)}px Segoe UI, Arial`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       
@@ -240,9 +258,15 @@ function App() {
       ctx.restore();
     });
 
-    // Draw snake
+    // Draw tuna (eel-like appearance)
     snake.forEach((segment, idx) => {
       ctx.save();
+      
+      // Tuna coloring: dark back, lighter belly
+      const isHead = idx === 0;
+      const baseHue = 35; // Brown/olive tone for eel
+      const saturation = 25 + idx * 2;
+      const lightness = 35 + idx * 3;
       
       if (slowGlowAlphaRef.current > 0.03) {
         const hue = (slowGlowPhaseRef.current * 36 + idx * 23) % 360;
@@ -250,32 +274,59 @@ function App() {
         ctx.shadowColor = `hsl(${hue}, 98%, 75%)`;
         ctx.shadowBlur = 40 * pulse * slowGlowAlphaRef.current;
       } else {
-        ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
-        ctx.shadowBlur = idx === 0 ? 18 : 8;
+        ctx.shadowColor = isHead ? "#f4e6c3" : "#8b9aa3";
+        ctx.shadowBlur = isHead ? 14 : 6;
       }
       
-      const hue1 = (180 + idx * 8) % 360;
-      const hue2 = (hue1 + 40) % 360;
+      // Create eel-like gradient (darker on top, lighter on bottom)
       const grad = ctx.createLinearGradient(
         segment.x, segment.y,
-        segment.x + GRID_SIZE, segment.y + GRID_SIZE
+        segment.x, segment.y + GRID_SIZE
       );
-      grad.addColorStop(0, `hsl(${hue1}, 80%, 85%)`);
-      grad.addColorStop(1, `hsl(${hue2}, 65%, 60%)`);
+      
+      // Dark brownish back
+      grad.addColorStop(0, `hsl(${baseHue}, ${saturation}%, ${Math.max(20, lightness - 15)}%)`);
+      // Lighter yellowish belly
+      grad.addColorStop(1, `hsl(${baseHue + 15}, ${saturation + 20}%, ${lightness + 25}%)`);
       
       ctx.fillStyle = grad;
-      ctx.strokeStyle = slowGlowAlphaRef.current > 0.03 ? "#fff" : "#111";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = slowGlowAlphaRef.current > 0.03 ? "#fff" : "#2a2416";
+      ctx.lineWidth = 1.5;
       
+      // Draw as ellipse/oval for smooth eel-like body
       ctx.beginPath();
-      if (ctx.roundRect) {
-        ctx.roundRect(segment.x, segment.y, GRID_SIZE, GRID_SIZE, 7);
+      const centerX = segment.x + GRID_SIZE / 2;
+      const centerY = segment.y + GRID_SIZE / 2;
+      
+      if (isHead) {
+        // Head is more rounded and slightly larger
+        ctx.ellipse(centerX, centerY, GRID_SIZE / 1.8, GRID_SIZE / 2.1, 0, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Add eyes to the head
+        ctx.shadowBlur = 0;
+        const eyeOffset = GRID_SIZE / 5;
+        const eyeSize = GRID_SIZE / 10;
+        
+        // Left eye
+        ctx.beginPath();
+        ctx.arc(centerX - eyeOffset, centerY - eyeOffset / 2, eyeSize, 0, 2 * Math.PI);
+        ctx.fillStyle = "#1a1a1a";
+        ctx.fill();
+        
+        // Right eye
+        ctx.beginPath();
+        ctx.arc(centerX + eyeOffset, centerY - eyeOffset / 2, eyeSize, 0, 2 * Math.PI);
+        ctx.fillStyle = "#1a1a1a";
+        ctx.fill();
       } else {
-        ctx.rect(segment.x, segment.y, GRID_SIZE, GRID_SIZE);
+        // Body segments are elongated ovals
+        ctx.ellipse(centerX, centerY, GRID_SIZE / 2, GRID_SIZE / 2.2, 0, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
       }
       
-      ctx.fill();
-      ctx.stroke();
       ctx.restore();
     });
   }, [snake, worms, awaitingInitialMove]);
@@ -546,7 +597,7 @@ function App() {
           translations={t}
         />
         <form className="login-form" onSubmit={handleLogin}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '10px', textAlign: 'center' }}>🐍</div>
+          <div style={{ fontSize: '2.5rem', marginBottom: '10px', textAlign: 'center' }}>🐟</div>
           <h2 style={{ color: '#ffe082', textAlign: 'center', marginBottom: '10px' }}>{t.loginWelcome}</h2>
           <div style={{ 
             color: '#81ff81', 
