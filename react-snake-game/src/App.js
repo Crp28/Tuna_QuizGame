@@ -14,13 +14,6 @@ const START_STEP_DELAY = 180;
 const MIN_STEP_DELAY = 105;
 
 // Utility functions
-const decode = (text) => {
-  try {
-    return atob(text);
-  } catch (e) {
-    return text;
-  }
-};
 
 const getCookie = (name) => {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -165,14 +158,10 @@ function App() {
 
     const loadQuestions = async () => {
       try {
-        const response = await fetch('/comp705-01/load_questions.php');
+        // Call Node.js backend API (no base64 decoding needed!)
+        const response = await fetch('/api/questions?folder=comp705-01');
         const data = await response.json();
-        const decodedQuestions = data.map(q => ({
-          question: decode(q.question),
-          options: q.options.map(decode),
-          answer: decode(q.answer)
-        }));
-        setQuestions(decodedQuestions);
+        setQuestions(data);
         setQuestionsLoaded(true);
       } catch (error) {
         console.error('Failed to load questions:', error);
@@ -181,7 +170,8 @@ function App() {
 
     const loadLeaderboard = async () => {
       try {
-        const response = await fetch('/comp705-01/load_leaderboard.php');
+        // Call Node.js backend API
+        const response = await fetch('/api/leaderboard?folder=comp705-01');
         const data = await response.json();
         setLeaderboard(data);
         setLeaderboardLoaded(true);
@@ -308,19 +298,20 @@ function App() {
     const finalEntry = {
       name: username,
       level: level,
-      time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0
+      time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
+      folder: 'comp705-01'
     };
     
     setLeaderboard(prev => {
       const updated = [...prev, finalEntry];
       updated.sort((a, b) => b.level - a.level || a.time - b.time);
       
-      // Save to backend
-      fetch('/comp705-01/save_leaderboard.php', {
+      // Save to Node.js backend
+      fetch('/api/leaderboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([finalEntry])
-      });
+        body: JSON.stringify(finalEntry)
+      }).catch(err => console.error('Failed to save score:', err));
       
       return updated;
     });
@@ -352,7 +343,8 @@ function App() {
           const newEntry = {
             name: username,
             level: level + 1,
-            time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0
+            time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
+            folder: 'comp705-01'
           };
           
           setLeaderboard(prev => {
@@ -366,12 +358,12 @@ function App() {
             }
             updated.sort((a, b) => b.level - a.level || a.time - b.time);
             
-            // Save to backend
-            fetch('/comp705-01/save_leaderboard.php', {
+            // Save to Node.js backend
+            fetch('/api/leaderboard', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify([newEntry])
-            });
+              body: JSON.stringify(newEntry)
+            }).catch(err => console.error('Failed to save score:', err));
             
             return updated;
           });
