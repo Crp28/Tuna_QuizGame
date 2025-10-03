@@ -1,16 +1,240 @@
-# Snake Quiz Game - React Standalone Version
+# Snake Quiz Game - React Version with Node.js Backend
 
-This is a **fully standalone** React implementation of the Snake Quiz Game. It requires **NO backend server** - everything runs in your browser!
+This is a React implementation of the Snake Quiz Game with a modern Node.js/Express backend.
 
-## 🎮 Quick Start
+## Architecture
+
+```
+React Frontend (port 3000) ↔ Node.js Backend (port 5000) ↔ MySQL Database
+```
+
+## Features
+
+- ✅ All game logic ported to React
+- ✅ Snake movement with keyboard controls (WASD or Arrow keys)
+- ✅ Question and answer system with worms
+- ✅ Collision detection
+- ✅ Score and level tracking
+- ✅ Global leaderboard with database persistence
+- ✅ **Node.js/Express backend** - Modern REST API
+- ✅ **No base64 encoding** - Simpler data format
+- ✅ Similar art style and animations
+- ✅ Slow-motion effect on correct answers
+- ✅ Login system with cookies
+- ✅ Next level progression
+
+## Setup
+
+### Prerequisites
+
+- Node.js (v14 or higher)
+- MySQL database with SNAKE schema
+- Two terminals (one for backend, one for frontend)
+
+### Installation
+
+#### 1. Start the Node.js Backend
 
 ```bash
-cd react-snake-game
+# Navigate to backend directory
+cd backend
+
+# Install dependencies
 npm install
+
+# Copy environment file
+cp .env.example .env
+
+# Edit .env with your database credentials (if needed)
+
+# Start the backend server
 npm start
 ```
 
-That's it! No PHP server, no database, no backend needed!
+Backend will run on `http://localhost:5000`
+
+#### 2. Start the React Frontend
+
+```bash
+# In a new terminal, navigate to react-snake-game
+cd react-snake-game
+
+# Install dependencies (if not already done)
+npm install
+
+# Start the React development server
+npm start
+```
+
+React app will run on `http://localhost:3000` and automatically proxy API requests to the backend.
+
+## Quick Start
+
+```bash
+# Terminal 1: Start backend
+cd backend && npm install && npm start
+
+# Terminal 2: Start frontend
+cd react-snake-game && npm install && npm start
+```
+
+Then open `http://localhost:3000` in your browser!
+
+## Architecture
+
+### Frontend (React)
+- **App.js**: Main component containing all game logic
+- **App.css**: Styling matching the original game's art style
+- **index.js**: React entry point
+- **translations.js**: Multi-language support
+
+### Backend (Node.js/Express)
+The React app uses a modern Node.js backend with REST API:
+- `GET /api/questions?folder=comp705-01` - Loads quiz questions
+- `GET /api/leaderboard?folder=comp705-01` - Loads leaderboard data
+- `POST /api/leaderboard` - Saves player scores
+
+**Key Difference from PHP**: Questions are returned in plain JSON (no base64 encoding!)
+
+### Database (MySQL)
+- **question_sets** table - Stores questions per folder
+- **leaderboard** table - Stores player scores
+
+## Game Logic
+
+The React version maintains exact parity with the original:
+
+1. **Snake Movement**: Uses `requestAnimationFrame` for smooth animation
+2. **Collision Detection**: Checks walls and self-collision
+3. **Question System**: Random question selection without repeats
+4. **Worm Generation**: Smart positioning to avoid snake and maintain spacing
+5. **Scoring**: Immediate leaderboard updates on correct answers
+6. **Visual Effects**: Slow-motion glow effect and canvas rendering
+
+## Key Benefits Over PHP Backend
+
+- ✅ **Simpler Data Format**: No base64 encoding/decoding needed
+- ✅ **Full JavaScript Stack**: Easier to maintain
+- ✅ **Modern REST API**: Clean endpoint design
+- ✅ **Better Performance**: Async/await, connection pooling
+- ✅ **Easier Deployment**: Many hosting options
+
+## Controls
+
+- **S**: Start game
+- **Arrow Keys** or **WASD**: Control snake direction
+
+## Browser Compatibility
+
+Works on all modern browsers that support:
+- ES6+
+- HTML5 Canvas
+- React 19
+
+## API Endpoints
+
+### Get Questions
+```http
+GET /api/questions?folder=comp705-01
+```
+
+### Get Leaderboard
+```http
+GET /api/leaderboard?folder=comp705-01
+```
+
+### Save Score
+```http
+POST /api/leaderboard
+Content-Type: application/json
+
+{
+  "name": "john_doe",
+  "level": 5,
+  "time": 45.23,
+  "folder": "comp705-01"
+}
+```
+
+## Development
+
+### Backend Development
+```bash
+cd backend
+npm run dev  # Uses nodemon for auto-reload
+```
+
+### Frontend Development
+```bash
+cd react-snake-game
+npm start  # Hot reload enabled
+```
+
+## Production Build
+
+### Backend
+```bash
+cd backend
+npm start  # Production mode
+```
+
+### Frontend
+```bash
+cd react-snake-game
+npm run build
+```
+
+The build files will be in the `build/` directory.
+
+## Deployment
+
+### Backend Options
+- Heroku (with ClearDB MySQL add-on)
+- DigitalOcean App Platform
+- AWS EC2
+- Docker container
+
+### Frontend Options
+- Any static host (Netlify, Vercel, GitHub Pages)
+- Serve with backend using Express static middleware
+- CDN deployment
+
+See `backend/README.md` for detailed deployment instructions.
+
+## Troubleshooting
+
+### "Failed to load questions"
+- Ensure backend is running on port 5000
+- Check database connection in backend logs
+- Verify MySQL SNAKE database exists
+
+### "Failed to save score"
+- Check backend is running
+- Verify database credentials in backend/.env
+- Check browser console for errors
+
+### CORS Errors
+- Ensure proxy in package.json points to backend: `"proxy": "http://localhost:5000"`
+- Backend CORS is configured for http://localhost:3000
+
+## Notes
+
+- The app uses cookies for user authentication (same as original)
+- Backend communication uses REST API (simpler than PHP)
+- Questions are returned in plain JSON (no encoding)
+- All animations and effects are preserved from original
+
+## Documentation
+
+- **backend/README.md** - Backend setup and API documentation
+- **NODEJS_BACKEND_PROPOSAL.md** - Architecture and design decisions
+- **COMPARISON.md** - Comparison with original PHP version
+
+---
+
+**Full JavaScript Stack** 🎉  
+**Modern Architecture** ✅  
+**Production Ready** 🚀
 
 ## ✨ Features
 

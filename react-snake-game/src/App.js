@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import translations from './translations';
 import LanguageSwitcher from './LanguageSwitcher';
-import { questions as staticQuestions } from './questionsData';
 
 const GRID_SIZE = 24;
 const CANVAS_WIDTH = 900;
@@ -157,30 +156,27 @@ function App() {
   useEffect(() => {
     if (!isLoggedIn) return;
 
-    const loadQuestions = () => {
-      // Load questions from static data (no backend needed)
-      setQuestions(staticQuestions);
-      setQuestionsLoaded(true);
+    const loadQuestions = async () => {
+      try {
+        // Call Node.js backend API (no base64 decoding needed!)
+        const response = await fetch('/api/questions?folder=comp705-01');
+        const data = await response.json();
+        setQuestions(data);
+        setQuestionsLoaded(true);
+      } catch (error) {
+        console.error('Failed to load questions:', error);
+      }
     };
 
-    const loadLeaderboard = () => {
+    const loadLeaderboard = async () => {
       try {
-        // Load leaderboard from localStorage
-        const stored = localStorage.getItem('snakeQuizLeaderboard');
-        const data = stored ? JSON.parse(stored) : [];
-        
-        // Sort by level (desc) then time (asc)
-        data.sort((a, b) => {
-          if (b.level !== a.level) return b.level - a.level;
-          return parseFloat(a.time) - parseFloat(b.time);
-        });
-        
+        // Call Node.js backend API
+        const response = await fetch('/api/leaderboard?folder=comp705-01');
+        const data = await response.json();
         setLeaderboard(data);
         setLeaderboardLoaded(true);
       } catch (error) {
         console.error('Failed to load leaderboard:', error);
-        setLeaderboard([]);
-        setLeaderboardLoaded(true);
       }
     };
 
@@ -294,15 +290,6 @@ function App() {
     }
   }, [isGameRunning, startTime]);
 
-  // Helper function to save leaderboard to localStorage
-  const saveLeaderboardToStorage = useCallback((entries) => {
-    try {
-      localStorage.setItem('snakeQuizLeaderboard', JSON.stringify(entries));
-    } catch (error) {
-      console.error('Failed to save leaderboard:', error);
-    }
-  }, []);
-
   // End game callback
   const endGame = useCallback(() => {
     setIsGameRunning(false);
@@ -311,21 +298,26 @@ function App() {
     const finalEntry = {
       name: username,
       level: level,
-      time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0
+      time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
+      folder: 'comp705-01'
     };
     
     setLeaderboard(prev => {
       const updated = [...prev, finalEntry];
       updated.sort((a, b) => b.level - a.level || a.time - b.time);
       
-      // Save to localStorage instead of backend
-      saveLeaderboardToStorage(updated);
+      // Save to Node.js backend
+      fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalEntry)
+      }).catch(err => console.error('Failed to save score:', err));
       
       return updated;
     });
     
     setShowSplash(true);
-  }, [username, level, startTime, saveLeaderboardToStorage]);
+  }, [username, level, startTime]);
 
   // Game loop
   useEffect(() => {
@@ -351,7 +343,8 @@ function App() {
           const newEntry = {
             name: username,
             level: level + 1,
-            time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0
+            time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
+            folder: 'comp705-01'
           };
           
           setLeaderboard(prev => {
@@ -365,8 +358,12 @@ function App() {
             }
             updated.sort((a, b) => b.level - a.level || a.time - b.time);
             
-            // Save to localStorage instead of backend
-            saveLeaderboardToStorage(updated);
+            // Save to Node.js backend
+            fetch('/api/leaderboard', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newEntry)
+            }).catch(err => console.error('Failed to save score:', err));
             
             return updated;
           });
@@ -455,7 +452,7 @@ function App() {
         cancelAnimationFrame(gameLoopRef.current);
       }
     };
-  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, username, startTime, drawGame, endGame, saveLeaderboardToStorage]);
+  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, username, startTime, drawGame, endGame]);
 
   const startGame = useCallback(() => {
     setSnake([
@@ -667,23 +664,21 @@ function App() {
                 {' '}
                 {t.nextLevelEligible}
                 <button
-                  onClick={() => alert('Next level not available in standalone version. Add more questions to questionsData.js!')}
+                  onClick={() => window.location.href = '/comp705-02/'}
                   style={{
-                    backgroundColor: '#999',
+                    backgroundColor: '#fff200',
                     marginLeft: '16px',
                     border: 'none',
                     borderRadius: '4px',
                     padding: '4px 10px',
                     fontWeight: 'bold',
                     fontSize: '0.9rem',
-                    cursor: 'not-allowed',
+                    cursor: 'pointer',
                     color: '#222',
                     boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-                    opacity: '0.6'
                   }}
-                  disabled
                 >
-                  {t.nextLevelButton} (Disabled)
+                  {t.nextLevelButton}
                 </button>
               </div>
             </div>
@@ -840,9 +835,14 @@ function App() {
           {t.footerMadeBy} <span style={{ color: '#fff', textShadow: '0 0 4px #ea0029cc' }}>AUT</span>
         </span>
         {' | '}
-        <span style={{ color: '#888', fontStyle: 'italic' }}>
-          Standalone Version (No Backend Required)
-        </span>
+        <a
+          href="/comp705-01/admin.php"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: '#ffe082', textDecoration: 'underline', fontWeight: 'bold' }}
+        >
+          {t.footerAdmin}
+        </a>
       </div>
     </div>
   );
