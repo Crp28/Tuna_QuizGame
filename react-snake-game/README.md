@@ -1,114 +1,308 @@
-# Snake Quiz Game - React Version
+# Snake Quiz Game - React Standalone Version
 
-This is a React implementation of the Snake Quiz Game, fully porting all game logic from the original vanilla JavaScript version.
+This is a **fully standalone** React implementation of the Snake Quiz Game. It requires **NO backend server** - everything runs in your browser!
 
-## Features
+## 🎮 Quick Start
+
+```bash
+cd react-snake-game
+npm install
+npm start
+```
+
+That's it! No PHP server, no database, no backend needed!
+
+## ✨ Features
 
 - ✅ All game logic ported to React
 - ✅ Snake movement with keyboard controls (WASD or Arrow keys)
 - ✅ Question and answer system with worms
 - ✅ Collision detection
 - ✅ Score and level tracking
-- ✅ Leaderboard integration
-- ✅ Backend communication with PHP APIs
+- ✅ Leaderboard with localStorage persistence
+- ✅ Login system with cookies
 - ✅ Similar art style and animations
 - ✅ Slow-motion effect on correct answers
-- ✅ Login system with cookies
-- ✅ Next level progression
+- ✅ **100% standalone - no backend required!**
 
-## Setup
+## 🚀 What's Different from Original?
 
-### Prerequisites
+### No Backend Dependencies
 
-- Node.js (v14 or higher)
-- PHP server for backend APIs
-- MySQL database
+**Original Version**:
+- Required PHP server running on port 8000
+- MySQL database for questions and leaderboard
+- Server-side validation and anti-cheat
 
-### Installation
+**Standalone Version**:
+- Questions stored in `src/questionsData.js`
+- Leaderboard stored in browser localStorage
+- All validation done client-side
+- No server required!
 
-1. Navigate to the react-snake-game directory:
-```bash
-cd react-snake-game
+### Trade-offs
+
+**What You Gain**:
+- ✅ Simple deployment (just `npm start`)
+- ✅ Works offline
+- ✅ Free hosting (GitHub Pages, Netlify, Vercel)
+- ✅ No server costs
+- ✅ Fast loading
+
+**What You Lose**:
+- ❌ Global leaderboard (only local to your browser)
+- ❌ Admin panel for question management
+- ❌ Server-side anti-cheat validation
+- ❌ Next level navigation (disabled)
+- ❌ Centralized question updates
+
+## 📝 Adding Questions
+
+Edit `src/questionsData.js`:
+
+```javascript
+export const questions = [
+  {
+    question: "Your question here?",
+    options: ["Option A", "Option B", "Option C", "Option D"],
+    answer: "B"  // The correct answer (A, B, C, or D)
+  },
+  // Add more questions...
+];
 ```
 
-2. Install dependencies:
+## 🎯 How It Works
+
+### Questions
+- Stored in `src/questionsData.js` as a JavaScript array
+- No encoding/decoding needed (questions are in plain text)
+- Edit the file and restart the app to see changes
+
+### Leaderboard
+- Saved to browser's localStorage
+- Persists across page refreshes
+- Each browser has its own leaderboard
+- Clear browser data to reset leaderboard
+
+### User Authentication
+- Uses cookies (same as original)
+- Stores: username, firstname, lastname, email
+- 180-day expiration
+
+## 🏗️ Architecture
+
+### Frontend Only
+- **App.js**: All game logic (~860 lines)
+- **App.css**: All styles
+- **questionsData.js**: Static questions
+- **translations.js**: Multi-language support
+- **LanguageSwitcher.js**: Language toggle component
+
+### No Backend
+- No PHP files
+- No MySQL database
+- No API calls
+- Everything runs in the browser
+
+## 📦 Deployment
+
+### Development
 ```bash
-npm install
-```
-
-### Running the Application
-
-#### Development Mode
-
-1. Start the PHP backend server (from the repository root):
-```bash
-php -S localhost:8000
-```
-
-2. In a new terminal, start the React development server:
-```bash
-cd react-snake-game
 npm start
 ```
+Opens on `http://localhost:3000`
 
-The React app will run on `http://localhost:3000` and proxy API requests to the PHP server on `http://localhost:8000`.
-
-#### Production Build
-
-To create a production build:
+### Production Build
 ```bash
 npm run build
 ```
+Creates optimized build in `build/` folder
 
-The build files will be in the `build/` directory. You can serve these static files with any web server alongside the PHP backend.
+### Deploy to Static Hosting
 
-## Architecture
+**GitHub Pages**:
+```bash
+npm run build
+# Deploy build/ folder to gh-pages branch
+```
 
-### Frontend (React)
-- **App.js**: Main component containing all game logic
-- **App.css**: Styling matching the original game's art style
-- **index.js**: React entry point
+**Netlify**:
+- Drag and drop `build/` folder to Netlify
+- Or connect GitHub repo for auto-deploys
 
-### Backend (PHP)
-The React app uses the existing PHP backend:
-- `/comp705-01/load_questions.php` - Loads quiz questions
-- `/comp705-01/load_leaderboard.php` - Loads leaderboard data
-- `/comp705-01/save_leaderboard.php` - Saves player scores
+**Vercel**:
+```bash
+vercel deploy
+```
 
-## Game Logic
+All these options are **FREE** and work perfectly!
 
-The React version maintains exact parity with the original:
-
-1. **Snake Movement**: Uses `requestAnimationFrame` for smooth animation
-2. **Collision Detection**: Checks walls and self-collision
-3. **Question System**: Random question selection without repeats
-4. **Worm Generation**: Smart positioning to avoid snake and maintain spacing
-5. **Scoring**: Immediate leaderboard updates on correct answers
-6. **Visual Effects**: Slow-motion glow effect and canvas rendering
-
-## Key Differences from Original
-
-- Uses React hooks (`useState`, `useEffect`, `useRef`) instead of global variables
-- Component-based architecture instead of procedural code
-- Functional programming patterns
-- Same backend APIs (no changes required to PHP files)
-
-## Controls
+## 🎮 Controls
 
 - **S**: Start game
 - **Arrow Keys** or **WASD**: Control snake direction
-- **ESC**: Close game over dialog (when implemented)
 
-## Browser Compatibility
+## 🌐 Browser Compatibility
 
-Works on all modern browsers that support:
-- ES6+
-- HTML5 Canvas
-- React 19
+Works on all modern browsers:
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+
+- Mobile browsers
 
-## Notes
+## 🔧 Customization
 
-- The app uses cookies for user authentication (same as original)
-- Backend communication requires a running PHP server
-- Canvas rendering maintains pixel-perfect accuracy with original
-- All animations and effects are preserved
+### Change Number of Questions for "Next Level"
+In `App.js`, find:
+```javascript
+if (newUsed.length >= Math.ceil(questions.length / 2)) {
+  setShowNextLevel(true);
+}
+```
+Change `/2` to adjust the threshold (currently 50%)
+
+### Modify Game Speed
+In `App.js`:
+```javascript
+const START_STEP_DELAY = 180;  // Starting speed
+const MIN_STEP_DELAY = 105;    // Maximum speed
+```
+
+### Canvas Size
+```javascript
+const CANVAS_WIDTH = 900;
+const CANVAS_HEIGHT = 700;
+```
+
+## 🧪 Testing
+
+### Clear Leaderboard
+Open browser DevTools → Application → localStorage → Delete `snakeQuizLeaderboard`
+
+### View Leaderboard Data
+Console:
+```javascript
+JSON.parse(localStorage.getItem('snakeQuizLeaderboard'))
+```
+
+### Reset Everything
+Clear all cookies and localStorage in browser settings
+
+## 📊 Features Comparison
+
+| Feature | PHP Version | Standalone Version |
+|---------|-------------|-------------------|
+| Questions | MySQL DB | Static file |
+| Leaderboard | MySQL DB | localStorage |
+| Multi-user | ✅ Global | ❌ Local only |
+| Offline | ❌ No | ✅ Yes |
+| Deployment | Requires PHP | Static hosting |
+| Admin Panel | ✅ Yes | ❌ No |
+| Hosting Cost | $5+/month | FREE |
+| Setup Time | 30 min | 2 min |
+
+## 🎯 Best Use Cases
+
+### Perfect For:
+- ✅ Demos and presentations
+- ✅ Portfolio projects
+- ✅ Learning React
+- ✅ Offline games
+- ✅ Quick prototypes
+- ✅ Free hosting needs
+
+### Not Ideal For:
+- ❌ Multi-user competitions
+- ❌ Centralized leaderboards
+- ❌ Dynamic question updates
+- ❌ User analytics
+- ❌ Anti-cheat requirements
+
+## 🐛 Troubleshooting
+
+**Q: Leaderboard doesn't save**
+- Check browser allows localStorage
+- Check if localStorage is full (rare)
+- Try incognito mode to test
+
+**Q: Questions don't load**
+- Check `questionsData.js` syntax
+- Check browser console for errors
+- Ensure proper import in App.js
+
+**Q: Game is slow**
+- Check browser performance
+- Close other tabs
+- Disable browser extensions
+
+## 📚 Project Structure
+
+```
+react-snake-game/
+├── src/
+│   ├── App.js                 # Main game component
+│   ├── App.css                # All styles
+│   ├── questionsData.js       # Static questions
+│   ├── LanguageSwitcher.js    # Language toggle
+│   ├── translations.js        # i18n strings
+│   └── index.js               # React entry point
+├── public/
+│   └── index.html
+├── package.json
+└── README.md
+```
+
+## 🔄 Migrating Back to PHP Backend
+
+If you need backend features later:
+
+1. Restore `proxy` in package.json
+2. Revert App.js changes
+3. Start PHP server
+4. Questions load from database
+5. Leaderboard syncs to MySQL
+
+The PHP backend files still exist in the parent directory!
+
+## 📖 Related Documentation
+
+- **REACT_PHP_DEPENDENCY_ANALYSIS.md** - Detailed analysis of what was changed
+- **STANDALONE_IMPLEMENTATION_PLAN.md** - Step-by-step implementation guide
+- **COMPARISON.md** - Original vs React comparison
+- **DEPLOYMENT_GUIDE.md** - Full deployment instructions
+
+## 💡 Tips
+
+1. **Add More Questions**: Edit `questionsData.js` with 50+ questions for better gameplay
+2. **Share Leaderboard**: Export localStorage and share JSON with friends
+3. **Offline Play**: After first load, works completely offline
+4. **Mobile**: Fully responsive, works on phones and tablets
+
+## 🎓 Learning Resources
+
+This standalone version is great for learning:
+- React hooks (useState, useEffect, useRef, useCallback)
+- Canvas API
+- localStorage API
+- Cookie management
+- Game loop with requestAnimationFrame
+
+## 📝 License
+
+Apache License 2.0 - See [LICENSE](../LICENSE) file
+
+## 🙏 Credits
+
+**Original Game**: Minh Nguyen @ AUT
+
+**React Implementation**: Standalone version based on the original PHP + React port
+
+## 🎉 Ready to Play?
+
+```bash
+npm install
+npm start
+```
+
+Have fun! 🐍🎮

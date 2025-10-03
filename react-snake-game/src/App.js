@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import translations from './translations';
 import LanguageSwitcher from './LanguageSwitcher';
+import { questions as staticQuestions } from './questionsData';
 
 const GRID_SIZE = 24;
 const CANVAS_WIDTH = 900;
@@ -14,13 +15,6 @@ const START_STEP_DELAY = 180;
 const MIN_STEP_DELAY = 105;
 
 // Utility functions
-const decode = (text) => {
-  try {
-    return atob(text);
-  } catch (e) {
-    return text;
-  }
-};
 
 const getCookie = (name) => {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -163,30 +157,30 @@ function App() {
   useEffect(() => {
     if (!isLoggedIn) return;
 
-    const loadQuestions = async () => {
-      try {
-        const response = await fetch('/comp705-01/load_questions.php');
-        const data = await response.json();
-        const decodedQuestions = data.map(q => ({
-          question: decode(q.question),
-          options: q.options.map(decode),
-          answer: decode(q.answer)
-        }));
-        setQuestions(decodedQuestions);
-        setQuestionsLoaded(true);
-      } catch (error) {
-        console.error('Failed to load questions:', error);
-      }
+    const loadQuestions = () => {
+      // Load questions from static data (no backend needed)
+      setQuestions(staticQuestions);
+      setQuestionsLoaded(true);
     };
 
-    const loadLeaderboard = async () => {
+    const loadLeaderboard = () => {
       try {
-        const response = await fetch('/comp705-01/load_leaderboard.php');
-        const data = await response.json();
+        // Load leaderboard from localStorage
+        const stored = localStorage.getItem('snakeQuizLeaderboard');
+        const data = stored ? JSON.parse(stored) : [];
+        
+        // Sort by level (desc) then time (asc)
+        data.sort((a, b) => {
+          if (b.level !== a.level) return b.level - a.level;
+          return parseFloat(a.time) - parseFloat(b.time);
+        });
+        
         setLeaderboard(data);
         setLeaderboardLoaded(true);
       } catch (error) {
         console.error('Failed to load leaderboard:', error);
+        setLeaderboard([]);
+        setLeaderboardLoaded(true);
       }
     };
 
@@ -300,6 +294,15 @@ function App() {
     }
   }, [isGameRunning, startTime]);
 
+  // Helper function to save leaderboard to localStorage
+  const saveLeaderboardToStorage = useCallback((entries) => {
+    try {
+      localStorage.setItem('snakeQuizLeaderboard', JSON.stringify(entries));
+    } catch (error) {
+      console.error('Failed to save leaderboard:', error);
+    }
+  }, []);
+
   // End game callback
   const endGame = useCallback(() => {
     setIsGameRunning(false);
@@ -315,18 +318,14 @@ function App() {
       const updated = [...prev, finalEntry];
       updated.sort((a, b) => b.level - a.level || a.time - b.time);
       
-      // Save to backend
-      fetch('/comp705-01/save_leaderboard.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([finalEntry])
-      });
+      // Save to localStorage instead of backend
+      saveLeaderboardToStorage(updated);
       
       return updated;
     });
     
     setShowSplash(true);
-  }, [username, level, startTime]);
+  }, [username, level, startTime, saveLeaderboardToStorage]);
 
   // Game loop
   useEffect(() => {
@@ -366,12 +365,8 @@ function App() {
             }
             updated.sort((a, b) => b.level - a.level || a.time - b.time);
             
-            // Save to backend
-            fetch('/comp705-01/save_leaderboard.php', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify([newEntry])
-            });
+            // Save to localStorage instead of backend
+            saveLeaderboardToStorage(updated);
             
             return updated;
           });
@@ -460,7 +455,7 @@ function App() {
         cancelAnimationFrame(gameLoopRef.current);
       }
     };
-  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, username, startTime, drawGame, endGame]);
+  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, username, startTime, drawGame, endGame, saveLeaderboardToStorage]);
 
   const startGame = useCallback(() => {
     setSnake([
@@ -672,21 +667,23 @@ function App() {
                 {' '}
                 {t.nextLevelEligible}
                 <button
-                  onClick={() => window.location.href = '/comp705-02/'}
+                  onClick={() => alert('Next level not available in standalone version. Add more questions to questionsData.js!')}
                   style={{
-                    backgroundColor: '#fff200',
+                    backgroundColor: '#999',
                     marginLeft: '16px',
                     border: 'none',
                     borderRadius: '4px',
                     padding: '4px 10px',
                     fontWeight: 'bold',
                     fontSize: '0.9rem',
-                    cursor: 'pointer',
+                    cursor: 'not-allowed',
                     color: '#222',
                     boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                    opacity: '0.6'
                   }}
+                  disabled
                 >
-                  {t.nextLevelButton}
+                  {t.nextLevelButton} (Disabled)
                 </button>
               </div>
             </div>
@@ -843,14 +840,9 @@ function App() {
           {t.footerMadeBy} <span style={{ color: '#fff', textShadow: '0 0 4px #ea0029cc' }}>AUT</span>
         </span>
         {' | '}
-        <a
-          href="/comp705-01/admin.php"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: '#ffe082', textDecoration: 'underline', fontWeight: 'bold' }}
-        >
-          {t.footerAdmin}
-        </a>
+        <span style={{ color: '#888', fontStyle: 'italic' }}>
+          Standalone Version (No Backend Required)
+        </span>
       </div>
     </div>
   );
