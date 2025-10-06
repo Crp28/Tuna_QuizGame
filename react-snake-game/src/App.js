@@ -383,7 +383,7 @@ function App() {
           ctx.shadowBlur = 40 * pulse * slowGlowAlphaRef.current;
         } else {
           ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
-          ctx.shadowBlur = idx === 0 ? 18 : 8;
+          ctx.shadowBlur = idx === 0 ? 6 : 3;
         }
         
         // Draw the tuna image
@@ -397,7 +397,7 @@ function App() {
           ctx.shadowBlur = 40 * pulse * slowGlowAlphaRef.current;
         } else {
           ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
-          ctx.shadowBlur = idx === 0 ? 18 : 8;
+          ctx.shadowBlur = idx === 0 ? 6 : 3;
         }
         
         const hue1 = (180 + idx * 8) % 360;
