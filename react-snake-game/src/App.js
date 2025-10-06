@@ -258,15 +258,16 @@ function App() {
       y: next.y - segment.y
     } : null;
 
-    // Head (first segment)
+    // Head (first segment) - faces the direction of movement
     if (idx === 0) {
+      // The head faces opposite to where the next segment is
       if (dirToNext) {
-        if (dirToNext.x > 0) return 'head_right';
-        if (dirToNext.x < 0) return 'head_left';
-        if (dirToNext.y > 0) return 'head_down';
-        if (dirToNext.y < 0) return 'head_up';
+        if (dirToNext.x > 0) return 'head_left';
+        if (dirToNext.x < 0) return 'head_right';
+        if (dirToNext.y > 0) return 'head_up';
+        if (dirToNext.y < 0) return 'head_down';
       }
-      // Fallback based on current direction
+      // Fallback based on current direction of movement
       if (direction.x > 0) return 'head_right';
       if (direction.x < 0) return 'head_left';
       if (direction.y > 0) return 'head_down';
@@ -274,13 +275,14 @@ function App() {
       return 'head_right';
     }
 
-    // Tail (last segment)
+    // Tail (last segment) - points in the direction it came from
     if (idx === snake.length - 1) {
       if (dirFromPrev) {
-        if (dirFromPrev.x > 0) return 'tail_horizontal_right';
-        if (dirFromPrev.x < 0) return 'tail_horizontal_left';
-        if (dirFromPrev.y > 0) return 'tail_vertical_down';
-        if (dirFromPrev.y < 0) return 'tail_vertical_up';
+        // Tail points opposite to where it came from
+        if (dirFromPrev.x > 0) return 'tail_horizontal_left';
+        if (dirFromPrev.x < 0) return 'tail_horizontal_right';
+        if (dirFromPrev.y > 0) return 'tail_vertical_up';
+        if (dirFromPrev.y < 0) return 'tail_vertical_down';
       }
       return 'tail_horizontal_right';
     }
@@ -291,27 +293,27 @@ function App() {
       const isTurning = dirFromPrev.x !== dirToNext.x && dirFromPrev.y !== dirToNext.y;
       
       if (isTurning) {
-        // Determine which turn
-        if ((dirFromPrev.x > 0 && dirToNext.y < 0) || (dirFromPrev.y < 0 && dirToNext.x > 0)) {
-          return 'turning_body_up_right';
-        }
-        if ((dirFromPrev.x < 0 && dirToNext.y < 0) || (dirFromPrev.y < 0 && dirToNext.x < 0)) {
-          return 'turning_body_up_left';
-        }
-        if ((dirFromPrev.x > 0 && dirToNext.y > 0) || (dirFromPrev.y > 0 && dirToNext.x > 0)) {
-          return 'turning_body_down_right';
-        }
-        if ((dirFromPrev.x < 0 && dirToNext.y > 0) || (dirFromPrev.y > 0 && dirToNext.x < 0)) {
-          return 'turning_body_down_left';
-        }
+        // For turning pieces, the names indicate which two directions they connect
+        // We need to figure out which two directions are being connected
+        const dirs = [];
+        if (dirFromPrev.x > 0 || dirToNext.x > 0) dirs.push('right');
+        if (dirFromPrev.x < 0 || dirToNext.x < 0) dirs.push('left');
+        if (dirFromPrev.y > 0 || dirToNext.y > 0) dirs.push('down');
+        if (dirFromPrev.y < 0 || dirToNext.y < 0) dirs.push('up');
+        
+        // The turning piece name should reflect the two directions it connects
+        if (dirs.includes('up') && dirs.includes('right')) return 'turning_body_up_right';
+        if (dirs.includes('up') && dirs.includes('left')) return 'turning_body_up_left';
+        if (dirs.includes('down') && dirs.includes('right')) return 'turning_body_down_right';
+        if (dirs.includes('down') && dirs.includes('left')) return 'turning_body_down_left';
       } else {
-        // Straight body segment
+        // Straight body segment - faces the direction the body is oriented
         if (dirFromPrev.x !== 0) {
-          // Horizontal
-          return dirFromPrev.x > 0 ? 'straight_body_horizontal_right' : 'straight_body_horizontal_left';
+          // Horizontal - body faces the direction opposite to where it came from
+          return dirFromPrev.x > 0 ? 'straight_body_horizontal_left' : 'straight_body_horizontal_right';
         } else {
-          // Vertical
-          return dirFromPrev.y > 0 ? 'straight_body_vertical_down' : 'straight_body_vertical_up';
+          // Vertical - body faces the direction opposite to where it came from
+          return dirFromPrev.y > 0 ? 'straight_body_vertical_up' : 'straight_body_vertical_down';
         }
       }
     }
