@@ -32,6 +32,10 @@ const randomBrightColor = () => {
 };
 
 const getRandomQuestion = (questions, usedQuestions) => {
+  if (!questions || questions.length === 0) {
+    console.error('No questions available');
+    return { question: null, usedQuestions: [] };
+  }
   if (usedQuestions.length >= questions.length) {
     usedQuestions = [];
   }
@@ -109,10 +113,26 @@ function App() {
   });
 
   // Game state
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState([
+    {
+      question: "What is the capital of New Zealand?",
+      options: ["Auckland", "Wellington", "Christchurch", "Hamilton"],
+      answer: "B"
+    },
+    {
+      question: "What is 2 + 2?",
+      options: ["3", "4", "5", "6"],
+      answer: "B"
+    },
+    {
+      question: "What color is the sky?",
+      options: ["Red", "Blue", "Green", "Yellow"],
+      answer: "B"
+    }
+  ]);
   const [leaderboard, setLeaderboard] = useState([]);
-  const [questionsLoaded, setQuestionsLoaded] = useState(false);
-  const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
+  const [questionsLoaded, setQuestionsLoaded] = useState(true);
+  const [leaderboardLoaded, setLeaderboardLoaded] = useState(true);
   const [snake, setSnake] = useState([
     { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
     { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
@@ -181,10 +201,14 @@ function App() {
         // Call Node.js backend API (no base64 decoding needed!)
         const response = await fetch('/api/questions?folder=comp705-01');
         const data = await response.json();
-        setQuestions(data);
+        if (data && Array.isArray(data) && data.length > 0) {
+          setQuestions(data);
+        }
         setQuestionsLoaded(true);
       } catch (error) {
         console.error('Failed to load questions:', error);
+        // Keep default questions - don't overwrite
+        setQuestionsLoaded(true);
       }
     };
 
@@ -193,10 +217,13 @@ function App() {
         // Call Node.js backend API
         const response = await fetch('/api/leaderboard?folder=comp705-01');
         const data = await response.json();
-        setLeaderboard(data);
+        setLeaderboard(Array.isArray(data) ? data : []);
         setLeaderboardLoaded(true);
       } catch (error) {
         console.error('Failed to load leaderboard:', error);
+        // Use empty array for testing
+        setLeaderboard([]);
+        setLeaderboardLoaded(true);
       }
     };
 
@@ -573,6 +600,11 @@ function App() {
   }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, username, startTime, drawGame, endGame]);
 
   const startGame = useCallback(() => {
+    if (!questions || questions.length === 0) {
+      console.error('No questions available');
+      return;
+    }
+    
     setSnake([
       { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
       { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
@@ -590,6 +622,11 @@ function App() {
     setShowNextLevel(false);
     
     const { question, usedQuestions: newUsed } = getRandomQuestion(questions, []);
+    if (!question) {
+      console.error('Could not get a valid question');
+      return;
+    }
+    
     setCurrentQuestion(question);
     setUsedQuestions(newUsed);
     const initialSnake = [
