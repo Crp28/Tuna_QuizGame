@@ -152,6 +152,7 @@ function App() {
   const [isSlow, setIsSlow] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [showNextLevel, setShowNextLevel] = useState(false);
+  const [questionAnimationClass, setQuestionAnimationClass] = useState('fade-in');
   
   const canvasRef = useRef(null);
   const gameLoopRef = useRef(null);
@@ -239,6 +240,10 @@ function App() {
       setUsedQuestions(newUsed);
       const newWorms = generateWormsForQuestion(question, snake);
       setWorms(newWorms);
+      
+      // Set animation class when question changes
+      const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
+      setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
     }
   }, [questions, currentQuestion, usedQuestions, snake]);
 
@@ -523,6 +528,10 @@ function App() {
           setWorms(newWorms);
           setSnake(newSnake);
           
+          // Set animation class when question changes
+          const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
+          setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
+          
           // Slow motion effect
           setIsSlow(true);
           setTimeout(() => setIsSlow(false), 2000);
@@ -555,7 +564,8 @@ function App() {
       return false;
     };
 
-    const gameLoop = () => {
+    // Game logic timer - runs even when tab is hidden
+    const gameLogicLoop = () => {
       const now = Date.now();
       if (!lastStepTimeRef.current) lastStepTimeRef.current = now;
       
@@ -571,8 +581,6 @@ function App() {
       }
 
       if (awaitingInitialMove && (nextDir.x === 0 && nextDir.y === 0)) {
-        drawGame();
-        gameLoopRef.current = requestAnimationFrame(gameLoop);
         return;
       } else if (awaitingInitialMove) {
         setDirection(nextDir);
@@ -585,16 +593,24 @@ function App() {
           endGame();
           return;
         }
+        // Update direction after the snake moves
+        setDirection(nextDir);
         lastStepTimeRef.current += stepDelay;
       }
-      
-      drawGame();
-      gameLoopRef.current = requestAnimationFrame(gameLoop);
     };
 
-    gameLoopRef.current = requestAnimationFrame(gameLoop);
+    // Drawing loop - uses requestAnimationFrame for smooth rendering
+    const drawLoop = () => {
+      drawGame();
+      gameLoopRef.current = requestAnimationFrame(drawLoop);
+    };
+
+    // Start both loops
+    const logicIntervalId = setInterval(gameLogicLoop, 16); // ~60fps for logic
+    gameLoopRef.current = requestAnimationFrame(drawLoop);
 
     return () => {
+      clearInterval(logicIntervalId);
       if (gameLoopRef.current) {
         cancelAnimationFrame(gameLoopRef.current);
       }
@@ -639,6 +655,10 @@ function App() {
     const newWorms = generateWormsForQuestion(question, initialSnake);
     setWorms(newWorms);
     
+    // Set animation class when question changes
+    const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
+    setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
+    
     setIsGameRunning(true);
   }, [questions]);
 
@@ -681,11 +701,6 @@ function App() {
     
     setUsername(formData.username);
     setIsLoggedIn(true);
-  };
-
-  const getAnimationClass = () => {
-    const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
-    return animations[Math.floor(Math.random() * animations.length)];
   };
 
   // Render login form if not logged in
@@ -766,10 +781,10 @@ function App() {
           <div className="question-panel">
             {currentQuestion ? (
               <div>
-                <div className={getAnimationClass()} style={{ marginBottom: '7px', fontSize: '1.15em' }}>
+                <div className={questionAnimationClass} style={{ marginBottom: '7px', fontSize: '1.15em' }}>
                   <b>{t.questionPrefix}</b> {currentQuestion.question}
                 </div>
-                <div className={`choices-row ${getAnimationClass()}`}>
+                <div className={`choices-row ${questionAnimationClass}`}>
                   {currentQuestion.options.map((option, i) => {
                     const label = ["A", "B", "C", "D"][i];
                     const worm = worms.find(w => w.label === label);

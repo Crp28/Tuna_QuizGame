@@ -39,10 +39,11 @@ a, button, input, textarea, select, label {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 21px 0 0 16px;
+  padding: 21px 16px 0 16px;
   box-sizing: border-box;
   height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .right-panel {
@@ -79,6 +80,7 @@ a, button, input, textarea, select, label {
 
 .question-panel {
   width: 100%;
+  max-width: 100%;
   background: #223a50;
   color: #fff;
   border-radius: 18px;
@@ -89,9 +91,11 @@ a, button, input, textarea, select, label {
   font-size: 1.18rem;
   font-weight: 500;
   overflow-y: auto;
+  overflow-x: hidden;
   max-height: 700px;
   word-break: break-word;
   letter-spacing: 0.4px;
+  box-sizing: border-box;
 }
 
 .choices-row {
