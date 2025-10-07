@@ -564,7 +564,8 @@ function App() {
       return false;
     };
 
-    const gameLoop = () => {
+    // Game logic timer - runs even when tab is hidden
+    const gameLogicLoop = () => {
       const now = Date.now();
       if (!lastStepTimeRef.current) lastStepTimeRef.current = now;
       
@@ -580,8 +581,6 @@ function App() {
       }
 
       if (awaitingInitialMove && (nextDir.x === 0 && nextDir.y === 0)) {
-        drawGame();
-        gameLoopRef.current = requestAnimationFrame(gameLoop);
         return;
       } else if (awaitingInitialMove) {
         setDirection(nextDir);
@@ -598,27 +597,23 @@ function App() {
         setDirection(nextDir);
         lastStepTimeRef.current += stepDelay;
       }
-      
-      drawGame();
-      gameLoopRef.current = requestAnimationFrame(gameLoop);
     };
 
-    // Use both requestAnimationFrame (for smooth drawing) and setInterval (for consistent timing)
-    // This ensures the game continues even when tab is not visible
-    gameLoopRef.current = requestAnimationFrame(gameLoop);
-    
-    const intervalId = setInterval(() => {
-      // This ensures game logic continues even when tab is hidden
-      if (gameLoopRef.current === null) {
-        gameLoopRef.current = requestAnimationFrame(gameLoop);
-      }
-    }, 50);
+    // Drawing loop - uses requestAnimationFrame for smooth rendering
+    const drawLoop = () => {
+      drawGame();
+      gameLoopRef.current = requestAnimationFrame(drawLoop);
+    };
+
+    // Start both loops
+    const logicIntervalId = setInterval(gameLogicLoop, 16); // ~60fps for logic
+    gameLoopRef.current = requestAnimationFrame(drawLoop);
 
     return () => {
+      clearInterval(logicIntervalId);
       if (gameLoopRef.current) {
         cancelAnimationFrame(gameLoopRef.current);
       }
-      clearInterval(intervalId);
     };
   }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, username, startTime, drawGame, endGame]);
 
