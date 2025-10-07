@@ -101,7 +101,7 @@ function App() {
   // Language state
   const [language, setLanguage] = useState('en');
   const t = translations[language];
-  
+
   // Login state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
@@ -153,7 +153,7 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [showNextLevel, setShowNextLevel] = useState(false);
   const [questionAnimationClass, setQuestionAnimationClass] = useState('fade-in');
-  
+
   const canvasRef = useRef(null);
   const gameLoopRef = useRef(null);
   const lastStepTimeRef = useRef(0);
@@ -170,7 +170,7 @@ function App() {
       'turning_body_up_left', 'turning_body_up_right',
       'turning_body_down_left', 'turning_body_down_right',
       'tail_vertical_up', 'tail_vertical_down',
-      'tail_horizontal_left', 'tail_horizontal_right'
+      'tail_horizontal_left', 'tail_horizontal_right', 'worms'
     ];
 
     imagesToLoad.forEach(name => {
@@ -240,7 +240,7 @@ function App() {
       setUsedQuestions(newUsed);
       const newWorms = generateWormsForQuestion(question, snake);
       setWorms(newWorms);
-      
+
       // Set animation class when question changes
       const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
       setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
@@ -257,7 +257,7 @@ function App() {
       x: segment.x - prev.x,
       y: segment.y - prev.y
     } : null;
-    
+
     const dirToNext = next ? {
       x: next.x - segment.x,
       y: next.y - segment.y
@@ -296,21 +296,27 @@ function App() {
     if (dirFromPrev && dirToNext) {
       // Check if this is a turning segment
       const isTurning = dirFromPrev.x !== dirToNext.x && dirFromPrev.y !== dirToNext.y;
-      
+
       if (isTurning) {
-        // For turning pieces, the names indicate which two directions they connect
-        // We need to figure out which two directions are being connected
-        const dirs = [];
-        if (dirFromPrev.x > 0 || dirToNext.x > 0) dirs.push('right');
-        if (dirFromPrev.x < 0 || dirToNext.x < 0) dirs.push('left');
-        if (dirFromPrev.y > 0 || dirToNext.y > 0) dirs.push('down');
-        if (dirFromPrev.y < 0 || dirToNext.y < 0) dirs.push('up');
-        
-        // The turning piece name should reflect the two directions it connects
-        if (dirs.includes('up') && dirs.includes('right')) return 'turning_body_up_right';
-        if (dirs.includes('up') && dirs.includes('left')) return 'turning_body_up_left';
-        if (dirs.includes('down') && dirs.includes('right')) return 'turning_body_down_right';
-        if (dirs.includes('down') && dirs.includes('left')) return 'turning_body_down_left';
+        // For turning pieces, we need to check the actual direction flow
+        // dirFromPrev tells us where we came from, dirToNext tells us where we're going
+
+        // Coming from left, turning up
+        if (dirFromPrev.x > 0 && dirToNext.y < 0) return 'turning_body_up_left';
+        // Coming from left, turning down  
+        if (dirFromPrev.x > 0 && dirToNext.y > 0) return 'turning_body_down_left';
+        // Coming from right, turning up
+        if (dirFromPrev.x < 0 && dirToNext.y < 0) return 'turning_body_up_right';
+        // Coming from right, turning down
+        if (dirFromPrev.x < 0 && dirToNext.y > 0) return 'turning_body_down_right';
+        // Coming from up, turning left
+        if (dirFromPrev.y > 0 && dirToNext.x < 0) return 'turning_body_up_left';
+        // Coming from up, turning right
+        if (dirFromPrev.y > 0 && dirToNext.x > 0) return 'turning_body_up_right';
+        // Coming from down, turning left
+        if (dirFromPrev.y < 0 && dirToNext.x < 0) return 'turning_body_down_left';
+        // Coming from down, turning right
+        if (dirFromPrev.y < 0 && dirToNext.x > 0) return 'turning_body_down_right';
       } else {
         // Straight body segment - faces the direction the body is oriented
         if (dirFromPrev.x !== 0) {
@@ -330,43 +336,43 @@ function App() {
   const drawGame = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw worms
     worms.forEach((worm, i) => {
       ctx.save();
-      
+
       const t = Date.now() / 600 + i;
       const dx = awaitingInitialMove ? 0 : Math.sin(t) * 2;
       const dy = awaitingInitialMove ? 0 : Math.cos(t + 0.4) * 2;
-      
+
       const cx = worm.x + GRID_SIZE / 2 + dx;
       const cy = worm.y + GRID_SIZE / 2 + dy;
-      
+
       ctx.shadowColor = worm.color;
       ctx.shadowBlur = 28;
-      
+
       ctx.beginPath();
       ctx.arc(cx, cy, GRID_SIZE / 1.85, 0, 2 * Math.PI);
       ctx.fillStyle = worm.color;
       ctx.fill();
-      
+
       ctx.shadowColor = "#fff";
       ctx.shadowBlur = 22;
       ctx.globalAlpha = 0.92;
       ctx.font = `bold ${Math.floor(GRID_SIZE * 1.0)}px Segoe UI, Arial`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      
+
       ctx.lineWidth = 3;
       ctx.strokeStyle = "#ffffff";
       ctx.strokeText(worm.label, cx, cy + 1);
-      
+
       ctx.fillStyle = "#111";
       ctx.fillText(worm.label, cx, cy + 1);
-      
+
       ctx.globalAlpha = 1;
       ctx.restore();
     });
@@ -374,11 +380,11 @@ function App() {
     // Draw snake
     snake.forEach((segment, idx) => {
       ctx.save();
-      
+
       // Get the appropriate tuna image
       const imageName = getTunaImage(segment, idx, snake);
       const img = tunaImagesRef.current[imageName];
-      
+
       if (img && img.complete) {
         // Apply glow effect if in slow mode
         if (slowGlowAlphaRef.current > 0.03) {
@@ -390,7 +396,7 @@ function App() {
           ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
           ctx.shadowBlur = idx === 0 ? 6 : 3;
         }
-        
+
         // Draw the tuna image
         ctx.drawImage(img, segment.x, segment.y, GRID_SIZE, GRID_SIZE);
       } else {
@@ -404,7 +410,7 @@ function App() {
           ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
           ctx.shadowBlur = idx === 0 ? 6 : 3;
         }
-        
+
         const hue1 = (180 + idx * 8) % 360;
         const hue2 = (hue1 + 40) % 360;
         const grad = ctx.createLinearGradient(
@@ -413,18 +419,18 @@ function App() {
         );
         grad.addColorStop(0, `hsl(${hue1}, 80%, 85%)`);
         grad.addColorStop(1, `hsl(${hue2}, 65%, 60%)`);
-        
+
         ctx.fillStyle = grad;
         ctx.strokeStyle = slowGlowAlphaRef.current > 0.03 ? "#fff" : "#111";
         ctx.lineWidth = 2;
-        
+
         ctx.beginPath();
         if (ctx.roundRect) {
           ctx.roundRect(segment.x, segment.y, GRID_SIZE, GRID_SIZE, 7);
         } else {
           ctx.rect(segment.x, segment.y, GRID_SIZE, GRID_SIZE);
         }
-        
+
         ctx.fill();
         ctx.stroke();
       }
@@ -446,28 +452,28 @@ function App() {
   const endGame = useCallback(() => {
     setIsGameRunning(false);
     setIsGameOver(true);
-    
+
     const finalEntry = {
       name: username,
       level: level,
       time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
       folder: 'comp705-01'
     };
-    
+
     setLeaderboard(prev => {
       const updated = [...prev, finalEntry];
       updated.sort((a, b) => b.level - a.level || a.time - b.time);
-      
+
       // Save to Node.js backend
       fetch('/api/leaderboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalEntry)
       }).catch(err => console.error('Failed to save score:', err));
-      
+
       return updated;
     });
-    
+
     setShowSplash(true);
   }, [username, level, startTime]);
 
@@ -482,7 +488,7 @@ function App() {
         x: snake[0].x + nextDir.x,
         y: snake[0].y + nextDir.y
       };
-      
+
       const newSnake = [head, ...snake];
 
       const eatenIdx = worms.findIndex(w => w.x === head.x && w.y === head.y);
@@ -490,7 +496,7 @@ function App() {
         const worm = worms[eatenIdx];
         if (worm.isCorrect) {
           setLevel(l => l + 1);
-          
+
           // Update leaderboard
           const newEntry = {
             name: username,
@@ -498,7 +504,7 @@ function App() {
             time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
             folder: 'comp705-01'
           };
-          
+
           setLeaderboard(prev => {
             const existingIndex = prev.findIndex(e => e.name === username);
             let updated;
@@ -509,17 +515,17 @@ function App() {
               updated = [...prev, newEntry];
             }
             updated.sort((a, b) => b.level - a.level || a.time - b.time);
-            
+
             // Save to Node.js backend
             fetch('/api/leaderboard', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(newEntry)
             }).catch(err => console.error('Failed to save score:', err));
-            
+
             return updated;
           });
-          
+
           // Next question
           const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestions);
           setCurrentQuestion(question);
@@ -527,20 +533,20 @@ function App() {
           const newWorms = generateWormsForQuestion(question, newSnake);
           setWorms(newWorms);
           setSnake(newSnake);
-          
+
           // Set animation class when question changes
           const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
           setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
-          
+
           // Slow motion effect
           setIsSlow(true);
           setTimeout(() => setIsSlow(false), 2000);
-          
+
           // Check for next level
           if (newUsed.length >= Math.ceil(questions.length / 2)) {
             setShowNextLevel(true);
           }
-          
+
           return true;
         } else {
           endGame();
@@ -568,9 +574,9 @@ function App() {
     const gameLogicLoop = () => {
       const now = Date.now();
       if (!lastStepTimeRef.current) lastStepTimeRef.current = now;
-      
+
       const stepDelay = isSlow ? 340 : Math.max(MIN_STEP_DELAY, START_STEP_DELAY - 2 * level);
-      
+
       const fadeSpeed = 0.09;
       if (isSlow) {
         slowGlowPhaseRef.current += 0.09;
@@ -622,7 +628,7 @@ function App() {
       console.error('No questions available');
       return;
     }
-    
+
     setSnake([
       { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
       { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
@@ -638,13 +644,13 @@ function App() {
     setAwaitingInitialMove(true);
     setShowSplash(false);
     setShowNextLevel(false);
-    
+
     const { question, usedQuestions: newUsed } = getRandomQuestion(questions, []);
     if (!question) {
       console.error('Could not get a valid question');
       return;
     }
-    
+
     setCurrentQuestion(question);
     setUsedQuestions(newUsed);
     const initialSnake = [
@@ -654,11 +660,11 @@ function App() {
     ];
     const newWorms = generateWormsForQuestion(question, initialSnake);
     setWorms(newWorms);
-    
+
     // Set animation class when question changes
     const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
     setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
-    
+
     setIsGameRunning(true);
   }, [questions]);
 
@@ -673,7 +679,7 @@ function App() {
       }
 
       const key = e.key.toLowerCase();
-      
+
       if ((key === 'arrowup' || key === 'w') && direction.y === 0) {
         setNextDir({ x: 0, y: -GRID_SIZE });
       } else if ((key === 'arrowdown' || key === 's') && direction.y === 0) {
@@ -691,14 +697,14 @@ function App() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    
+
     // Save cookies
     setCookie('username', formData.username);
     setCookie('firstname', formData.firstname);
     setCookie('lastname', formData.lastname);
     setCookie('email', formData.email);
     setCookie('full_name', `${formData.firstname} ${formData.lastname}`);
-    
+
     setUsername(formData.username);
     setIsLoggedIn(true);
   };
@@ -706,13 +712,13 @@ function App() {
   // Render login form if not logged in
   if (!isLoggedIn) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        minHeight: '100vh' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh'
       }}>
-        <LanguageSwitcher 
+        <LanguageSwitcher
           currentLanguage={language}
           onLanguageChange={setLanguage}
           translations={t}
@@ -720,12 +726,12 @@ function App() {
         <form className="login-form" onSubmit={handleLogin}>
           <div style={{ fontSize: '2.5rem', marginBottom: '10px', textAlign: 'center' }}>🐍</div>
           <h2 style={{ color: '#ffe082', textAlign: 'center', marginBottom: '10px' }}>{t.loginWelcome}</h2>
-          <div style={{ 
-            color: '#81ff81', 
-            fontSize: '1.1rem', 
-            fontWeight: '600', 
-            textAlign: 'center', 
-            marginBottom: '20px' 
+          <div style={{
+            color: '#81ff81',
+            fontSize: '1.1rem',
+            fontWeight: '600',
+            textAlign: 'center',
+            marginBottom: '20px'
           }}>
             {t.loginEnterDetails}
           </div>
@@ -769,7 +775,7 @@ function App() {
 
   return (
     <div className="App">
-      <LanguageSwitcher 
+      <LanguageSwitcher
         currentLanguage={language}
         onLanguageChange={setLanguage}
         translations={t}
@@ -789,7 +795,7 @@ function App() {
                     const label = ["A", "B", "C", "D"][i];
                     const worm = worms.find(w => w.label === label);
                     const color = worm ? worm.color : '#ffffff';
-                    
+
                     return (
                       <div
                         key={i}
@@ -858,12 +864,12 @@ function App() {
 
           {/* Leaderboard */}
           <div id="mainLeaderboard">
-            <div style={{ 
-              fontSize: '1.5em', 
-              marginBottom: '12px', 
-              fontWeight: '700', 
-              color: '#ffe082', 
-              letterSpacing: '1px' 
+            <div style={{
+              fontSize: '1.5em',
+              marginBottom: '12px',
+              fontWeight: '700',
+              color: '#ffe082',
+              letterSpacing: '1px'
             }}>
               {t.leaderboardTitle}
             </div>
@@ -907,7 +913,7 @@ function App() {
                       leaderboard.map((row, i) => {
                         const isUser = row.name === username;
                         const medal = ['🥇', '🥈', '🥉'];
-                        
+
                         return (
                           <tr
                             key={i}
