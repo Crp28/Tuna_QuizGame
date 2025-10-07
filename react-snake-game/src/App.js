@@ -32,6 +32,10 @@ const randomBrightColor = () => {
 };
 
 const getRandomQuestion = (questions, usedQuestions) => {
+  if (!questions || questions.length === 0) {
+    console.error('No questions available');
+    return { question: null, usedQuestions: [] };
+  }
   if (usedQuestions.length >= questions.length) {
     usedQuestions = [];
   }
@@ -109,10 +113,26 @@ function App() {
   });
 
   // Game state
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState([
+    {
+      question: "What is the capital of New Zealand?",
+      options: ["Auckland", "Wellington", "Christchurch", "Hamilton"],
+      answer: "B"
+    },
+    {
+      question: "What is 2 + 2?",
+      options: ["3", "4", "5", "6"],
+      answer: "B"
+    },
+    {
+      question: "What color is the sky?",
+      options: ["Red", "Blue", "Green", "Yellow"],
+      answer: "B"
+    }
+  ]);
   const [leaderboard, setLeaderboard] = useState([]);
-  const [questionsLoaded, setQuestionsLoaded] = useState(false);
-  const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
+  const [questionsLoaded, setQuestionsLoaded] = useState(true);
+  const [leaderboardLoaded, setLeaderboardLoaded] = useState(true);
   const [snake, setSnake] = useState([
     { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
     { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
@@ -138,6 +158,26 @@ function App() {
   const lastStepTimeRef = useRef(0);
   const slowGlowPhaseRef = useRef(0);
   const slowGlowAlphaRef = useRef(0);
+  const tunaImagesRef = useRef({});
+
+  // Preload tuna images
+  useEffect(() => {
+    const imagesToLoad = [
+      'head_up', 'head_down', 'head_left', 'head_right',
+      'straight_body_vertical_up', 'straight_body_vertical_down',
+      'straight_body_horizontal_left', 'straight_body_horizontal_right',
+      'turning_body_up_left', 'turning_body_up_right',
+      'turning_body_down_left', 'turning_body_down_right',
+      'tail_vertical_up', 'tail_vertical_down',
+      'tail_horizontal_left', 'tail_horizontal_right'
+    ];
+
+    imagesToLoad.forEach(name => {
+      const img = new Image();
+      img.src = `${process.env.PUBLIC_URL}/${name}.png`;
+      tunaImagesRef.current[name] = img;
+    });
+  }, []);
 
   // Check login status on mount
   useEffect(() => {
@@ -161,10 +201,14 @@ function App() {
         // Call Node.js backend API (no base64 decoding needed!)
         const response = await fetch('/api/questions?folder=comp705-01');
         const data = await response.json();
-        setQuestions(data);
+        if (data && Array.isArray(data) && data.length > 0) {
+          setQuestions(data);
+        }
         setQuestionsLoaded(true);
       } catch (error) {
         console.error('Failed to load questions:', error);
+        // Keep default questions - don't overwrite
+        setQuestionsLoaded(true);
       }
     };
 
@@ -173,10 +217,13 @@ function App() {
         // Call Node.js backend API
         const response = await fetch('/api/leaderboard?folder=comp705-01');
         const data = await response.json();
-        setLeaderboard(data);
+        setLeaderboard(Array.isArray(data) ? data : []);
         setLeaderboardLoaded(true);
       } catch (error) {
         console.error('Failed to load leaderboard:', error);
+        // Use empty array for testing
+        setLeaderboard([]);
+        setLeaderboardLoaded(true);
       }
     };
 
@@ -194,6 +241,85 @@ function App() {
       setWorms(newWorms);
     }
   }, [questions, currentQuestion, usedQuestions, snake]);
+
+  // Helper function to get the appropriate tuna image for a snake segment
+  const getTunaImage = useCallback((segment, idx, snake) => {
+    const prev = idx > 0 ? snake[idx - 1] : null;
+    const next = idx < snake.length - 1 ? snake[idx + 1] : null;
+
+    // Calculate direction vectors
+    const dirFromPrev = prev ? {
+      x: segment.x - prev.x,
+      y: segment.y - prev.y
+    } : null;
+    
+    const dirToNext = next ? {
+      x: next.x - segment.x,
+      y: next.y - segment.y
+    } : null;
+
+    // Head (first segment) - faces the direction of movement
+    if (idx === 0) {
+      // The head faces opposite to where the next segment is
+      if (dirToNext) {
+        if (dirToNext.x > 0) return 'head_left';
+        if (dirToNext.x < 0) return 'head_right';
+        if (dirToNext.y > 0) return 'head_up';
+        if (dirToNext.y < 0) return 'head_down';
+      }
+      // Fallback based on current direction of movement
+      if (direction.x > 0) return 'head_right';
+      if (direction.x < 0) return 'head_left';
+      if (direction.y > 0) return 'head_down';
+      if (direction.y < 0) return 'head_up';
+      return 'head_right';
+    }
+
+    // Tail (last segment) - points in the direction it came from
+    if (idx === snake.length - 1) {
+      if (dirFromPrev) {
+        // Tail points opposite to where it came from
+        if (dirFromPrev.x > 0) return 'tail_horizontal_left';
+        if (dirFromPrev.x < 0) return 'tail_horizontal_right';
+        if (dirFromPrev.y > 0) return 'tail_vertical_up';
+        if (dirFromPrev.y < 0) return 'tail_vertical_down';
+      }
+      return 'tail_horizontal_right';
+    }
+
+    // Body segments - check if turning or straight
+    if (dirFromPrev && dirToNext) {
+      // Check if this is a turning segment
+      const isTurning = dirFromPrev.x !== dirToNext.x && dirFromPrev.y !== dirToNext.y;
+      
+      if (isTurning) {
+        // For turning pieces, the names indicate which two directions they connect
+        // We need to figure out which two directions are being connected
+        const dirs = [];
+        if (dirFromPrev.x > 0 || dirToNext.x > 0) dirs.push('right');
+        if (dirFromPrev.x < 0 || dirToNext.x < 0) dirs.push('left');
+        if (dirFromPrev.y > 0 || dirToNext.y > 0) dirs.push('down');
+        if (dirFromPrev.y < 0 || dirToNext.y < 0) dirs.push('up');
+        
+        // The turning piece name should reflect the two directions it connects
+        if (dirs.includes('up') && dirs.includes('right')) return 'turning_body_up_right';
+        if (dirs.includes('up') && dirs.includes('left')) return 'turning_body_up_left';
+        if (dirs.includes('down') && dirs.includes('right')) return 'turning_body_down_right';
+        if (dirs.includes('down') && dirs.includes('left')) return 'turning_body_down_left';
+      } else {
+        // Straight body segment - faces the direction the body is oriented
+        if (dirFromPrev.x !== 0) {
+          // Horizontal - body faces the direction opposite to where it came from
+          return dirFromPrev.x > 0 ? 'straight_body_horizontal_left' : 'straight_body_horizontal_right';
+        } else {
+          // Vertical - body faces the direction opposite to where it came from
+          return dirFromPrev.y > 0 ? 'straight_body_vertical_up' : 'straight_body_vertical_down';
+        }
+      }
+    }
+
+    return 'straight_body_horizontal_right';
+  }, [direction]);
 
   // Draw game
   const drawGame = useCallback(() => {
@@ -244,41 +370,62 @@ function App() {
     snake.forEach((segment, idx) => {
       ctx.save();
       
-      if (slowGlowAlphaRef.current > 0.03) {
-        const hue = (slowGlowPhaseRef.current * 36 + idx * 23) % 360;
-        const pulse = 0.8 + 0.25 * Math.sin(slowGlowPhaseRef.current + idx * 0.6);
-        ctx.shadowColor = `hsl(${hue}, 98%, 75%)`;
-        ctx.shadowBlur = 40 * pulse * slowGlowAlphaRef.current;
+      // Get the appropriate tuna image
+      const imageName = getTunaImage(segment, idx, snake);
+      const img = tunaImagesRef.current[imageName];
+      
+      if (img && img.complete) {
+        // Apply glow effect if in slow mode
+        if (slowGlowAlphaRef.current > 0.03) {
+          const hue = (slowGlowPhaseRef.current * 36 + idx * 23) % 360;
+          const pulse = 0.8 + 0.25 * Math.sin(slowGlowPhaseRef.current + idx * 0.6);
+          ctx.shadowColor = `hsl(${hue}, 98%, 75%)`;
+          ctx.shadowBlur = 40 * pulse * slowGlowAlphaRef.current;
+        } else {
+          ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
+          ctx.shadowBlur = idx === 0 ? 6 : 3;
+        }
+        
+        // Draw the tuna image
+        ctx.drawImage(img, segment.x, segment.y, GRID_SIZE, GRID_SIZE);
       } else {
-        ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
-        ctx.shadowBlur = idx === 0 ? 18 : 8;
+        // Fallback to original drawing if image not loaded
+        if (slowGlowAlphaRef.current > 0.03) {
+          const hue = (slowGlowPhaseRef.current * 36 + idx * 23) % 360;
+          const pulse = 0.8 + 0.25 * Math.sin(slowGlowPhaseRef.current + idx * 0.6);
+          ctx.shadowColor = `hsl(${hue}, 98%, 75%)`;
+          ctx.shadowBlur = 40 * pulse * slowGlowAlphaRef.current;
+        } else {
+          ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
+          ctx.shadowBlur = idx === 0 ? 6 : 3;
+        }
+        
+        const hue1 = (180 + idx * 8) % 360;
+        const hue2 = (hue1 + 40) % 360;
+        const grad = ctx.createLinearGradient(
+          segment.x, segment.y,
+          segment.x + GRID_SIZE, segment.y + GRID_SIZE
+        );
+        grad.addColorStop(0, `hsl(${hue1}, 80%, 85%)`);
+        grad.addColorStop(1, `hsl(${hue2}, 65%, 60%)`);
+        
+        ctx.fillStyle = grad;
+        ctx.strokeStyle = slowGlowAlphaRef.current > 0.03 ? "#fff" : "#111";
+        ctx.lineWidth = 2;
+        
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(segment.x, segment.y, GRID_SIZE, GRID_SIZE, 7);
+        } else {
+          ctx.rect(segment.x, segment.y, GRID_SIZE, GRID_SIZE);
+        }
+        
+        ctx.fill();
+        ctx.stroke();
       }
-      
-      const hue1 = (180 + idx * 8) % 360;
-      const hue2 = (hue1 + 40) % 360;
-      const grad = ctx.createLinearGradient(
-        segment.x, segment.y,
-        segment.x + GRID_SIZE, segment.y + GRID_SIZE
-      );
-      grad.addColorStop(0, `hsl(${hue1}, 80%, 85%)`);
-      grad.addColorStop(1, `hsl(${hue2}, 65%, 60%)`);
-      
-      ctx.fillStyle = grad;
-      ctx.strokeStyle = slowGlowAlphaRef.current > 0.03 ? "#fff" : "#111";
-      ctx.lineWidth = 2;
-      
-      ctx.beginPath();
-      if (ctx.roundRect) {
-        ctx.roundRect(segment.x, segment.y, GRID_SIZE, GRID_SIZE, 7);
-      } else {
-        ctx.rect(segment.x, segment.y, GRID_SIZE, GRID_SIZE);
-      }
-      
-      ctx.fill();
-      ctx.stroke();
       ctx.restore();
     });
-  }, [snake, worms, awaitingInitialMove]);
+  }, [snake, worms, awaitingInitialMove, getTunaImage]);
 
   // Update game time
   useEffect(() => {
@@ -455,6 +602,11 @@ function App() {
   }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, username, startTime, drawGame, endGame]);
 
   const startGame = useCallback(() => {
+    if (!questions || questions.length === 0) {
+      console.error('No questions available');
+      return;
+    }
+    
     setSnake([
       { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
       { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
@@ -472,6 +624,11 @@ function App() {
     setShowNextLevel(false);
     
     const { question, usedQuestions: newUsed } = getRandomQuestion(questions, []);
+    if (!question) {
+      console.error('Could not get a valid question');
+      return;
+    }
+    
     setCurrentQuestion(question);
     setUsedQuestions(newUsed);
     const initialSnake = [
