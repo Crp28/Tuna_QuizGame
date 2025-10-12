@@ -140,18 +140,19 @@ router.post('/', async (req, res) => {
       });
     }
     
-    // Get user info from cookies (if available)
-    const username = req.cookies?.username || name;
-    const fullName = req.cookies?.full_name || '';
-    const email = req.cookies?.email || '';
+    // Get user info from session (if available)
+    const userId = req.session?.userId || null;
+    const username = req.session?.username || name;
+    const fullName = req.session?.name || '';
+    const email = req.session?.email || '';
     const ipAddress = req.ip || req.connection?.remoteAddress || 'unknown';
     
     // Insert into database
     await db.query(
       `INSERT INTO leaderboard 
-       (username, full_name, email, level, time, ip_address, folder)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [username, fullName, email, levelNum, timeNum, ipAddress, folder]
+       (user_id, username, full_name, email, level, time, ip_address, folder)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, username, fullName, email, levelNum, timeNum, ipAddress, folder]
     );
     
     res.json({ success: true });
