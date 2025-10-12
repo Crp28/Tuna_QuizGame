@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import translations from './translations';
 import LanguageSwitcher from './LanguageSwitcher';
+import LoginPage from './LoginPage';
+import UserPanel from './UserPanel';
+import QuestionBankSelector from './QuestionBankSelector';
 
 const GRID_SIZE = 24;
 const CANVAS_WIDTH = 900;
@@ -14,17 +17,6 @@ const START_STEP_DELAY = 180;
 const MIN_STEP_DELAY = 105;
 
 // Utility functions
-
-const getCookie = (name) => {
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? decodeURIComponent(match[2]) : null;
-};
-
-const setCookie = (name, value, days = 180) => {
-  const date = new Date();
-  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/`;
-};
 
 const randomBrightColor = () => {
   const hue = Math.floor(Math.random() * 360);
@@ -102,15 +94,12 @@ function App() {
   const [language, setLanguage] = useState('en');
   const t = translations[language];
 
-  // Login state
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState('');
-  const [formData, setFormData] = useState({
-    username: '',
-    firstname: '',
-    lastname: '',
-    email: ''
-  });
+  // Auth state
+  const [user, setUser] = useState(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Question bank state
+  const [currentBank, setCurrentBank] = useState('comp705-01');
 
   // Game state
   const [questions, setQuestions] = useState([
@@ -180,27 +169,38 @@ function App() {
     });
   }, []);
 
-  // Check login status on mount
+  // Check authentication status on mount
   useEffect(() => {
-    const savedUsername = getCookie('username');
-    const firstname = getCookie('firstname');
-    const lastname = getCookie('lastname');
-    const email = getCookie('email');
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include'
+        });
 
-    if (savedUsername && firstname && lastname && email) {
-      setUsername(savedUsername);
-      setIsLoggedIn(true);
-    }
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
   // Load questions and leaderboard
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!user) return;
 
     const loadQuestions = async () => {
       try {
-        // Call Node.js backend API (no base64 decoding needed!)
-        const response = await fetch('/api/questions?folder=comp705-01');
+        // Call Node.js backend API with selected bank
+        const response = await fetch(`/api/questions?folder=${currentBank}`, {
+          credentials: 'include'
+        });
         const data = await response.json();
         if (data && Array.isArray(data) && data.length > 0) {
           setQuestions(data);
@@ -215,8 +215,10 @@ function App() {
 
     const loadLeaderboard = async () => {
       try {
-        // Call Node.js backend API
-        const response = await fetch('/api/leaderboard?folder=comp705-01');
+        // Call Node.js backend API with selected bank
+        const response = await fetch(`/api/leaderboard?folder=${currentBank}`, {
+          credentials: 'include'
+        });
         const data = await response.json();
         setLeaderboard(Array.isArray(data) ? data : []);
         setLeaderboardLoaded(true);
@@ -230,7 +232,7 @@ function App() {
 
     loadQuestions();
     loadLeaderboard();
-  }, [isLoggedIn]);
+  }, [user, currentBank]);
 
   // Initialize first question
   useEffect(() => {
@@ -454,10 +456,10 @@ function App() {
     setIsGameOver(true);
 
     const finalEntry = {
-      name: username,
+      name: user.username,
       level: level,
       time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
-      folder: 'comp705-01'
+      folder: currentBank
     };
 
     setLeaderboard(prev => {
@@ -475,7 +477,7 @@ function App() {
     });
 
     setShowSplash(true);
-  }, [username, level, startTime]);
+  }, [user, level, startTime, currentBank]);
 
   // Game loop
   useEffect(() => {
@@ -499,14 +501,14 @@ function App() {
 
           // Update leaderboard
           const newEntry = {
-            name: username,
+            name: user.username,
             level: level + 1,
             time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
-            folder: 'comp705-01'
+            folder: currentBank
           };
 
           setLeaderboard(prev => {
-            const existingIndex = prev.findIndex(e => e.name === username);
+            const existingIndex = prev.findIndex(e => e.name === user.username);
             let updated;
             if (existingIndex !== -1) {
               updated = [...prev];
@@ -621,7 +623,7 @@ function App() {
         cancelAnimationFrame(gameLoopRef.current);
       }
     };
-  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, username, startTime, drawGame, endGame]);
+  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, user, startTime, drawGame, endGame, currentBank]);
 
   const startGame = useCallback(() => {
     if (!questions || questions.length === 0) {
@@ -695,81 +697,62 @@ function App() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [isGameRunning, direction, questionsLoaded, leaderboardLoaded, startGame]);
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-
-    // Save cookies
-    setCookie('username', formData.username);
-    setCookie('firstname', formData.firstname);
-    setCookie('lastname', formData.lastname);
-    setCookie('email', formData.email);
-    setCookie('full_name', `${formData.firstname} ${formData.lastname}`);
-
-    setUsername(formData.username);
-    setIsLoggedIn(true);
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
   };
 
-  // Render login form if not logged in
-  if (!isLoggedIn) {
+  const handleLogout = () => {
+    setUser(null);
+    // Reset game state
+    setLevel(1);
+    setIsGameRunning(false);
+    setIsGameOver(false);
+    setShowSplash(true);
+  };
+
+  const handleBankChange = (bank) => {
+    if (bank && bank.folder) {
+      setCurrentBank(bank.folder);
+      // Reset game when changing banks
+      setLevel(1);
+      setIsGameRunning(false);
+      setIsGameOver(false);
+      setShowSplash(true);
+      setUsedQuestions([]);
+    }
+  };
+
+  // Show loading while checking auth
+  if (isCheckingAuth) {
     return (
       <div style={{
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        minHeight: '100vh'
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        color: '#ffe082',
+        fontSize: '1.5rem'
       }}>
+        Loading...
+      </div>
+    );
+  }
+
+  // Render login form if not authenticated
+  if (!user) {
+    return (
+      <>
         <LanguageSwitcher
           currentLanguage={language}
           onLanguageChange={setLanguage}
           translations={t}
         />
-        <form className="login-form" onSubmit={handleLogin}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '10px', textAlign: 'center' }}>🐍</div>
-          <h2 style={{ color: '#ffe082', textAlign: 'center', marginBottom: '10px' }}>{t.loginWelcome}</h2>
-          <div style={{
-            color: '#81ff81',
-            fontSize: '1.1rem',
-            fontWeight: '600',
-            textAlign: 'center',
-            marginBottom: '20px'
-          }}>
-            {t.loginEnterDetails}
-          </div>
-          <input
-            type="text"
-            placeholder={t.loginUsername}
-            maxLength="30"
-            required
-            value={formData.username}
-            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder={t.loginFirstName}
-            maxLength="30"
-            required
-            value={formData.firstname}
-            onChange={(e) => setFormData({ ...formData, firstname: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder={t.loginLastName}
-            maxLength="30"
-            required
-            value={formData.lastname}
-            onChange={(e) => setFormData({ ...formData, lastname: e.target.value })}
-          />
-          <input
-            type="email"
-            placeholder={t.loginEmail}
-            maxLength="80"
-            required
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          />
-          <button type="submit">{t.loginPlayButton}</button>
-        </form>
-      </div>
+        <LoginPage 
+          onLoginSuccess={handleLoginSuccess}
+          translations={t}
+        />
+      </>
     );
   }
 
@@ -911,7 +894,7 @@ function App() {
                       </tr>
                     ) : (
                       leaderboard.map((row, i) => {
-                        const isUser = row.name === username;
+                        const isUser = row.name === user.username;
                         const medal = ['🥇', '🥈', '🥉'];
 
                         return (
@@ -949,6 +932,23 @@ function App() {
         {/* Right Panel */}
         <div className="right-panel">
           <div className="game-area">
+            {/* User Panel */}
+            <UserPanel 
+              user={user}
+              onLogout={handleLogout}
+              onQuestionBankChange={handleBankChange}
+              translations={t}
+            />
+            
+            {/* Question Bank Selector */}
+            <div style={{ marginBottom: '12px' }}>
+              <QuestionBankSelector 
+                currentBank={currentBank}
+                onBankChange={handleBankChange}
+                translations={t}
+              />
+            </div>
+
             <div className="game-title">
               🧑‍💻 {t.gameTitle}{' '}
               <span style={{
@@ -957,7 +957,7 @@ function App() {
                 WebkitTextFillColor: 'transparent',
                 fontWeight: 'bold',
               }}>
-                {username}
+                {user.name}
               </span>{' '}
               {t.gameAtBlock}{' '}
               <span style={{
@@ -966,7 +966,7 @@ function App() {
                 WebkitTextFillColor: 'transparent',
                 fontWeight: 'bold',
               }}>
-                comp705-01
+                {currentBank}
               </span>
             </div>
 
@@ -984,7 +984,7 @@ function App() {
             {showSplash && (
               <div className="splash">
                 <div style={{ fontSize: '2.1rem', fontWeight: '600', marginBottom: '12px' }}>
-                  {isGameOver ? `${t.splashPlayAgain} ${username}?` : `${t.splashReady} ${username}?`}
+                  {isGameOver ? `${t.splashPlayAgain} ${user.name}?` : `${t.splashReady} ${user.name}?`}
                 </div>
                 <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>
                   {t.splashStartPrompt}

@@ -1,0 +1,261 @@
+.admin-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fade-in 0.2s ease;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.admin-panel-modal {
+  background: #23324a;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  animation: slide-up 0.3s ease;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.admin-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 2px solid #2a3f5f;
+}
+
+.admin-panel-header h2 {
+  color: #ffe082;
+  font-size: 1.5rem;
+  margin: 0;
+  font-weight: 700;
+}
+
+.close-button {
+  background: transparent;
+  border: none;
+  color: #b4eaff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: all 0.2s ease;
+}
+
+.close-button:hover {
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.admin-panel-tabs {
+  display: flex;
+  gap: 10px;
+  padding: 20px 24px 0;
+}
+
+.admin-panel-tabs .tab {
+  flex: 1;
+  padding: 10px 16px;
+  background: #16213e;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  color: #b4eaff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.admin-panel-tabs .tab:hover {
+  background: #1e2d47;
+  color: #ffffff;
+}
+
+.admin-panel-tabs .tab.active {
+  background: linear-gradient(135deg, #ff4081 0%, #7c4dff 100%);
+  color: #ffffff;
+}
+
+.admin-panel-content {
+  padding: 24px;
+}
+
+.message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 0 24px 16px;
+  font-size: 0.95rem;
+  text-align: center;
+  animation: slide-down 0.3s ease;
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.error-message {
+  background: #ff5252;
+  color: #ffffff;
+}
+
+.success-message {
+  background: #00c853;
+  color: #ffffff;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-form label {
+  color: #81ff81;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.admin-form input,
+.admin-form select,
+.admin-form textarea {
+  padding: 12px 16px;
+  background: #16213e;
+  border: 2px solid #2a3f5f;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.admin-form input:focus,
+.admin-form select:focus,
+.admin-form textarea:focus {
+  outline: none;
+  border-color: #ff4081;
+  box-shadow: 0 0 0 3px rgba(255, 64, 129, 0.1);
+}
+
+.admin-form input::placeholder,
+.admin-form textarea::placeholder {
+  color: #7a8ba0;
+}
+
+.admin-form input:disabled,
+.admin-form select:disabled,
+.admin-form textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-form textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.helper-text {
+  color: #b4eaff;
+  font-size: 0.85rem;
+  margin-top: -4px;
+}
+
+.admin-form .submit-button {
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #ff4081 0%, #7c4dff 100%);
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(255, 64, 129, 0.3);
+}
+
+.admin-form .submit-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 64, 129, 0.4);
+}
+
+.admin-form .submit-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.admin-form .submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Scrollbar styling */
+.admin-panel-modal::-webkit-scrollbar {
+  width: 10px;
+}
+
+.admin-panel-modal::-webkit-scrollbar-track {
+  background: #16213e;
+  border-radius: 0 16px 16px 0;
+}
+
+.admin-panel-modal::-webkit-scrollbar-thumb {
+  background: #ff4081;
+  border-radius: 5px;
+}
+
+.admin-panel-modal::-webkit-scrollbar-thumb:hover {
+  background: #7c4dff;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .admin-panel-modal {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .admin-panel-header,
+  .admin-panel-content {
+    padding: 16px;
+  }
+
+  .admin-panel-tabs {
+    padding: 16px 16px 0;
+  }
+}
