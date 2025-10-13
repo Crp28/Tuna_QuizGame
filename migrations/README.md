@@ -14,6 +14,8 @@ mysql -u root -p SNAKE < migrations/001_add_user_accounts.sql
 
 Replace `root` with your MySQL username and `SNAKE` with your database name if different.
 
+**Note:** This migration is compatible with MySQL 8.0+ and uses dynamic SQL with prepared statements to check for existing columns/indexes before adding them. This ensures the migration can be run multiple times safely.
+
 ### Step 2: Verify the migration
 
 Check that the new tables were created:
@@ -91,19 +93,27 @@ VALUES ('admin', 'Admin User', 'admin@example.com', 'your-password-hash', 'admin
 
 ## Troubleshooting
 
+### Error: "You have an error in your SQL syntax" with "IF NOT EXISTS"
+
+**Problem:** MySQL 8.0 (and earlier versions) don't support `IF NOT EXISTS` clause in `ALTER TABLE` statements for adding columns or indexes. This syntax is only available in MariaDB.
+
+**Solution:** The migration has been updated to use dynamic SQL with prepared statements that check `INFORMATION_SCHEMA` tables before adding columns/indexes. This approach is compatible with MySQL 8.0+.
+
+If you still encounter this error, ensure you're using the latest version of the migration file from this repository.
+
 ### Error: "Table already exists"
 
-The migration uses `IF NOT EXISTS` and `IF NOT EXISTS` clauses, so it's safe to run multiple times. However, if you encounter this error, it means the tables were already created.
+The migration uses `IF NOT EXISTS` for table creation and dynamic checks for column/index additions, so it's safe to run multiple times. If you encounter this error for tables, it means the tables were already created successfully.
 
 ### Error: "Column already exists"
 
-Similarly, the `ADD COLUMN IF NOT EXISTS` syntax is used, so running the migration multiple times is safe.
+The migration uses `INFORMATION_SCHEMA` checks to verify if columns exist before adding them. If you see a message like "Column name already exists", this is informational and the migration is working correctly - it's skipping that column because it already exists.
 
 ### Error: "Cannot add foreign key constraint"
 
 This can happen if:
-1. The referenced table doesn't exist yet
+1. The referenced table doesn't exist yet (ensure `users` table is created first)
 2. The referenced column doesn't exist
-3. Data type mismatch
+3. Data type mismatch between foreign key and referenced column
 
-Make sure you're running the migration in the correct order and that all prerequisites are met.
+The migration is designed to run in the correct order, so this shouldn't occur if the migration is run from start to finish without interruption.
