@@ -35,7 +35,8 @@ function AdminPanel({ onClose, translations }) {
     selectBank: 'Select Bank',
     questionsPlaceholder: 'Paste questions in JSON format...',
     addQuestionsButton: 'Add Questions',
-    loading: 'Loading...'
+    loading: 'Loading...',
+    bankName: 'Bank Name'
   };
 
   useEffect(() => {

@@ -2,7 +2,22 @@
 
 const translations = {
   en: {
-    // Login form
+    // Login/Register page
+    loginTitle: "Login",
+    registerTitle: "Register",
+    username: "Username",
+    password: "Password",
+    confirmPassword: "Confirm Password",
+    name: "Full Name",
+    email: "Email",
+    accountType: "Account Type",
+    student: "Student",
+    admin: "Admin",
+    loginButton: "Login",
+    registerButton: "Register",
+    loading: "Loading...",
+    
+    // Old login form (keep for backward compatibility)
     loginWelcome: "Welcome!",
     loginEnterDetails: "Please enter your details to start playing:",
     loginUsername: "Nickname or Username",
@@ -10,6 +25,27 @@ const translations = {
     loginLastName: "Last Name",
     loginEmail: "Email",
     loginPlayButton: "Play Now",
+    
+    // User Panel
+    logout: "Logout",
+    loggingOut: "Logging out...",
+    adminPanel: "Admin Panel",
+    
+    // Admin Panel
+    adminPanelTitle: "Admin Panel",
+    createBankTab: "Create Bank",
+    addQuestionsTab: "Add Questions",
+    close: "Close",
+    folder: "Folder ID",
+    bankName: "Bank Name",
+    description: "Description (optional)",
+    createButton: "Create Question Bank",
+    selectBank: "Select Bank",
+    questionsPlaceholder: "Paste questions in JSON format...",
+    addQuestionsButton: "Add Questions",
+    
+    // Question Bank Selector
+    selectQuestionBank: "Select Question Bank",
     
     // Game title and info
     gameTitle: "Snake Quiz Game for",
@@ -64,7 +100,22 @@ const translations = {
     languageMaori: "Te Reo Māori"
   },
   mi: {
-    // Login form
+    // Login/Register page
+    loginTitle: "Takiuru",
+    registerTitle: "Rēhita",
+    username: "Ingoa Kaiwhakamahi",
+    password: "Kupuhipa",
+    confirmPassword: "Whakamana Kupuhipa",
+    name: "Ingoa Tūturu",
+    email: "Īmēra",
+    accountType: "Momo Pūkete",
+    student: "Ākonga",
+    admin: "Kaiwhakahaere",
+    loginButton: "Takiuru",
+    registerButton: "Rēhita",
+    loading: "E uta ana...",
+    
+    // Old login form (keep for backward compatibility)
     loginWelcome: "Nau mai!",
     loginEnterDetails: "Tēnā koa, whakauruhia ō taipitopito kia tīmata te tākaro:",
     loginUsername: "Ingoa ingoa, ingoa kaiwhakamahi rānei",
@@ -72,6 +123,27 @@ const translations = {
     loginLastName: "Ingoa Whakamutunga",
     loginEmail: "Īmēra",
     loginPlayButton: "Tākaro Ināianei",
+    
+    // User Panel
+    logout: "Takiputa",
+    loggingOut: "E takiputa ana...",
+    adminPanel: "Papa Kaiwhakahaere",
+    
+    // Admin Panel
+    adminPanelTitle: "Papa Kaiwhakahaere",
+    createBankTab: "Waihanga Pūtea",
+    addQuestionsTab: "Tāpiri Pātai",
+    close: "Kati",
+    folder: "ID Kōpaki",
+    bankName: "Ingoa Pūtea",
+    description: "Whakamāramatanga (kōwhiringa)",
+    createButton: "Waihanga Pūtea Pātai",
+    selectBank: "Tīpako Pūtea",
+    questionsPlaceholder: "Whakauru ngā pātai i te hōputu JSON...",
+    addQuestionsButton: "Tāpiri Pātai",
+    
+    // Question Bank Selector
+    selectQuestionBank: "Tīpako Pūtea Pātai",
     
     // Game title and info
     gameTitle: "Kēmu Pātai Nākahi mō",
