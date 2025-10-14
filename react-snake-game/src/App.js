@@ -958,15 +958,6 @@ function App() {
                 fontWeight: 'bold',
               }}>
                 {user.name}
-              </span>{' '}
-              {t.gameAtBlock}{' '}
-              <span style={{
-                background: 'linear-gradient(90deg, #ff4081, #7c4dff, #40c4ff)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                fontWeight: 'bold',
-              }}>
-                {currentBank}
               </span>
             </div>
 

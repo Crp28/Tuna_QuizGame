@@ -39,7 +39,7 @@ a, button, input, textarea, select, label {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 21px 16px 0 16px;
+  padding: 16px 16px 16px 16px;
   box-sizing: border-box;
   height: 100vh;
   overflow-y: auto;
@@ -58,24 +58,26 @@ a, button, input, textarea, select, label {
 
 .game-title {
   color: #fff;
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;  
   text-shadow: 2px 4px 12px #24243e60;
-  letter-spacing: 2px;
-  text-align: left;
+  letter-spacing: 1px;
+  text-align: center;
+  margin-bottom: 8px;
 }
 
 .score {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   background: rgba(40,62,81,0.55);
-  padding: 7px 18px;
+  padding: 6px 14px;
   border-radius: 12px;
   box-shadow: 0 2px 8px #0005;
   font-weight: 600;
   color: #ffe082;
   user-select: none;
-  margin-bottom: 18px;
-  margin-top: 6px;
+  margin-bottom: 12px;
+  margin-top: 0;
+  text-align: center;
 }
 
 .question-panel {
@@ -139,12 +141,14 @@ a, button, input, textarea, select, label {
 .game-area {
   position: relative;
   margin: 0 auto;
-  width: 900px;
-  max-width: 98vw;
+  width: 100%;
+  max-width: 900px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 12px;
+  box-sizing: border-box;
 }
 
 canvas {

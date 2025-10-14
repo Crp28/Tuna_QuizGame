@@ -21,7 +21,14 @@ function AdminPanel({ onClose, translations }) {
 
   // Add questions form
   const [selectedBank, setSelectedBank] = useState('');
-  const [questionsText, setQuestionsText] = useState('');
+  const [questionForm, setQuestionForm] = useState({
+    question: '',
+    optionA: '',
+    optionB: '',
+    optionC: '',
+    optionD: '',
+    answer: 'A'
+  });
 
   const t = translations || {
     adminPanelTitle: 'Admin Panel',
@@ -33,10 +40,17 @@ function AdminPanel({ onClose, translations }) {
     description: 'Description (optional)',
     createButton: 'Create Question Bank',
     selectBank: 'Select Bank',
-    questionsPlaceholder: 'Paste questions in JSON format...',
-    addQuestionsButton: 'Add Questions',
+    questionText: 'Question Text',
+    optionA: 'Option A',
+    optionB: 'Option B',
+    optionC: 'Option C',
+    optionD: 'Option D',
+    correctAnswer: 'Correct Answer',
+    addQuestionButton: 'Add Question',
     loading: 'Loading...',
-    bankName: 'Bank Name'
+    bankName: 'Bank Name',
+    questionPlaceholder: 'Enter your question here...',
+    optionPlaceholder: 'Enter option text...'
   };
 
   useEffect(() => {
@@ -98,36 +112,54 @@ function AdminPanel({ onClose, translations }) {
       return;
     }
 
-    if (!questionsText.trim()) {
-      setError('Please enter questions');
+    // Validate all fields are filled
+    if (!questionForm.question.trim() || 
+        !questionForm.optionA.trim() || 
+        !questionForm.optionB.trim() || 
+        !questionForm.optionC.trim() || 
+        !questionForm.optionD.trim()) {
+      setError('Please fill in all question fields');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Parse questions JSON
-      const questions = JSON.parse(questionsText);
-
-      if (!Array.isArray(questions)) {
-        throw new Error('Questions must be an array');
-      }
+      // Create question object
+      const question = {
+        question: questionForm.question.trim(),
+        options: [
+          questionForm.optionA.trim(),
+          questionForm.optionB.trim(),
+          questionForm.optionC.trim(),
+          questionForm.optionD.trim()
+        ],
+        answer: questionForm.answer
+      };
 
       const response = await fetch(`/api/question-banks/${selectedBank}/questions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ questions })
+        body: JSON.stringify({ questions: [question] })
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to add questions');
+        throw new Error(data.error || 'Failed to add question');
       }
 
-      setSuccess(`Successfully added ${data.addedCount} questions!`);
-      setQuestionsText('');
+      setSuccess(`Successfully added question to the question bank!`);
+      // Clear form
+      setQuestionForm({
+        question: '',
+        optionA: '',
+        optionB: '',
+        optionC: '',
+        optionD: '',
+        answer: 'A'
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -237,24 +269,88 @@ function AdminPanel({ onClose, translations }) {
               </div>
 
               <div className="form-group">
-                <label htmlFor="questions-text">Questions (JSON)</label>
+                <label htmlFor="question-text">{t.questionText}</label>
                 <textarea
-                  id="questions-text"
-                  rows="15"
-                  value={questionsText}
-                  onChange={(e) => setQuestionsText(e.target.value)}
-                  placeholder={t.questionsPlaceholder}
+                  id="question-text"
+                  rows="3"
+                  value={questionForm.question}
+                  onChange={(e) => setQuestionForm({ ...questionForm, question: e.target.value })}
+                  placeholder={t.questionPlaceholder}
                   disabled={isLoading}
                   required
-                  style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}
                 />
-                <div className="helper-text">
-                  Format: [{"{"}"question": "...", "options": ["A", "B", "C", "D"], "answer": "A"{"}"}]
-                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="option-a">{t.optionA}</label>
+                <input
+                  id="option-a"
+                  type="text"
+                  value={questionForm.optionA}
+                  onChange={(e) => setQuestionForm({ ...questionForm, optionA: e.target.value })}
+                  placeholder={t.optionPlaceholder}
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="option-b">{t.optionB}</label>
+                <input
+                  id="option-b"
+                  type="text"
+                  value={questionForm.optionB}
+                  onChange={(e) => setQuestionForm({ ...questionForm, optionB: e.target.value })}
+                  placeholder={t.optionPlaceholder}
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="option-c">{t.optionC}</label>
+                <input
+                  id="option-c"
+                  type="text"
+                  value={questionForm.optionC}
+                  onChange={(e) => setQuestionForm({ ...questionForm, optionC: e.target.value })}
+                  placeholder={t.optionPlaceholder}
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="option-d">{t.optionD}</label>
+                <input
+                  id="option-d"
+                  type="text"
+                  value={questionForm.optionD}
+                  onChange={(e) => setQuestionForm({ ...questionForm, optionD: e.target.value })}
+                  placeholder={t.optionPlaceholder}
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="correct-answer">{t.correctAnswer}</label>
+                <select
+                  id="correct-answer"
+                  value={questionForm.answer}
+                  onChange={(e) => setQuestionForm({ ...questionForm, answer: e.target.value })}
+                  disabled={isLoading}
+                  required
+                >
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                </select>
               </div>
 
               <button type="submit" className="submit-button" disabled={isLoading}>
-                {isLoading ? t.loading : t.addQuestionsButton}
+                {isLoading ? t.loading : t.addQuestionButton}
               </button>
             </form>
           )}

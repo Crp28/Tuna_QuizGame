@@ -1,23 +1,27 @@
 .question-bank-selector {
   position: relative;
   z-index: 100;
+  width: 100%;
+  max-width: 900px;
+  margin-bottom: 10px;
 }
 
 .bank-selector-button {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
+  gap: 8px;
+  padding: 8px 14px;
   background: linear-gradient(135deg, #7c4dff 0%, #9575cd 100%);
   border: none;
   border-radius: 8px;
   color: #ffffff;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(124, 77, 255, 0.3);
-  min-width: 250px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .bank-selector-button:hover:not(:disabled) {
@@ -31,7 +35,8 @@
 }
 
 .bank-icon {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .bank-name {
@@ -40,11 +45,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .bank-arrow {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   transition: transform 0.3s ease;
+  flex-shrink: 0;
 }
 
 .bank-arrow.open {
