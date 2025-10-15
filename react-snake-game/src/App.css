@@ -153,7 +153,7 @@ a, button, input, textarea, select, label {
 
 canvas {
   display: block;
-  background: radial-gradient(ellipse at 60% 30%, #1a232f 70%, #10121b 100%);
+  background: #1a232f; /* Fallback color if image doesn't load */
   border: 8px solid #24243e;
   border-radius: 30px;
   box-shadow: 0 20px 48px #0007, 0 4px 18px #27c9e6a0 inset;

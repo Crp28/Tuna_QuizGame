@@ -149,8 +149,9 @@ function App() {
   const slowGlowPhaseRef = useRef(0);
   const slowGlowAlphaRef = useRef(0);
   const tunaImagesRef = useRef({});
+  const bgImageRef = useRef(null);
 
-  // Preload tuna images
+  // Preload tuna images and background
   useEffect(() => {
     const imagesToLoad = [
       'head_up', 'head_down', 'head_left', 'head_right',
@@ -167,6 +168,11 @@ function App() {
       img.src = `${process.env.PUBLIC_URL}/${name}.png`;
       tunaImagesRef.current[name] = img;
     });
+
+    // Load background image
+    const bgImg = new Image();
+    bgImg.src = `${process.env.PUBLIC_URL}/bg.png`;
+    bgImageRef.current = bgImg;
   }, []);
 
   // Check authentication status on mount
@@ -341,6 +347,33 @@ function App() {
 
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw background image if loaded
+    if (bgImageRef.current && bgImageRef.current.complete) {
+      ctx.drawImage(bgImageRef.current, 0, 0, canvas.width, canvas.height);
+    }
+
+    // Draw very light grid lines
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'; // Very light, barely visible
+    ctx.lineWidth = 0.5;
+    
+    // Draw vertical lines
+    for (let x = 0; x <= canvas.width; x += GRID_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    
+    // Draw horizontal lines
+    for (let y = 0; y <= canvas.height; y += GRID_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+    ctx.restore();
 
     // Draw worms
     worms.forEach((worm, i) => {
