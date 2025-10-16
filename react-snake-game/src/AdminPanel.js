@@ -33,7 +33,6 @@ function AdminPanel({ onClose, translations }) {
   // Bulk upload form
   const [bulkUploadBank, setBulkUploadBank] = useState('');
   const [bulkJsonText, setBulkJsonText] = useState('');
-  const [bulkUploadStats, setBulkUploadStats] = useState(null);
 
   const t = translations || {
     adminPanelTitle: 'Admin Panel',
@@ -184,7 +183,6 @@ function AdminPanel({ onClose, translations }) {
     e.preventDefault();
     setError('');
     setSuccess('');
-    setBulkUploadStats(null);
 
     if (!bulkUploadBank) {
       setError('Please select a question bank');
@@ -246,10 +244,6 @@ function AdminPanel({ onClose, translations }) {
         throw new Error(data.error || 'Failed to upload questions');
       }
 
-      setBulkUploadStats({
-        added: data.addedCount,
-        total: data.totalCount
-      });
       setSuccess(`${t.bulkUploadSuccess} ${data.addedCount} question(s)! Total in bank: ${data.totalCount}`);
       setBulkJsonText('');
     } catch (err) {
@@ -314,7 +308,6 @@ function AdminPanel({ onClose, translations }) {
               setActiveTab('bulk');
               setError('');
               setSuccess('');
-              setBulkUploadStats(null);
             }}
           >
             {t.bulkUploadTab}
