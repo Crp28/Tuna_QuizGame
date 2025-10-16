@@ -4,8 +4,8 @@ const LanguageSwitcher = ({ currentLanguage, onLanguageChange, translations }) =
   return (
     <div style={{
       position: 'fixed',
-      top: '20px',
-      right: '20px',
+      bottom: '10px',
+      left: '20px',
       zIndex: 1000,
       display: 'flex',
       alignItems: 'center',
@@ -18,9 +18,9 @@ const LanguageSwitcher = ({ currentLanguage, onLanguageChange, translations }) =
       fontWeight: '600',
       fontSize: '1rem',
     }}>
-      <label 
+      <label
         htmlFor="language-select"
-        style={{ 
+        style={{
           color: '#ffe082',
           userSelect: 'none',
           cursor: 'default'

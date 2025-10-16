@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import translations from './translations';
 import LanguageSwitcher from './LanguageSwitcher';
+import LoginPage from './LoginPage';
+import UserPanel from './UserPanel';
+import QuestionBankSelector from './QuestionBankSelector';
 
 const GRID_SIZE = 24;
 const CANVAS_WIDTH = 900;
@@ -15,21 +18,16 @@ const MIN_STEP_DELAY = 105;
 
 // Utility functions
 
-const getCookie = (name) => {
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? decodeURIComponent(match[2]) : null;
-};
+const getColor = (() => {
+  const hues = [310, 200, 64, 135];
+  let index = 0;
 
-const setCookie = (name, value, days = 180) => {
-  const date = new Date();
-  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/`;
-};
-
-const randomBrightColor = () => {
-  const hue = Math.floor(Math.random() * 360);
-  return `hsl(${hue}, 85%, 65%)`;
-};
+  return () => {
+    const hue = hues[index];
+    index = (index + 1) % hues.length;
+    return `hsl(${hue}, 85%, 65%)`;
+  };
+})();
 
 const getRandomQuestion = (questions, usedQuestions) => {
   if (!questions || questions.length === 0) {
@@ -93,7 +91,7 @@ const generateWormsForQuestion = (question, snake) => {
     y: positions[i].y,
     label,
     isCorrect: label === question.answer,
-    color: randomBrightColor()
+    color: getColor()
   }));
 };
 
@@ -102,33 +100,19 @@ function App() {
   const [language, setLanguage] = useState('en');
   const t = translations[language];
 
-  // Login state
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState('');
-  const [formData, setFormData] = useState({
-    username: '',
-    firstname: '',
-    lastname: '',
-    email: ''
-  });
+  // Auth state
+  const [user, setUser] = useState(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Question bank state
+  const [currentBank, setCurrentBank] = useState('comp705-01');
 
   // Game state
   const [questions, setQuestions] = useState([
     {
-      question: "What is the capital of New Zealand?",
-      options: ["Auckland", "Wellington", "Christchurch", "Hamilton"],
-      answer: "B"
+      question: "Questions will show after game start.",
+      options: ["", "", "", ""],
     },
-    {
-      question: "What is 2 + 2?",
-      options: ["3", "4", "5", "6"],
-      answer: "B"
-    },
-    {
-      question: "What color is the sky?",
-      options: ["Red", "Blue", "Green", "Yellow"],
-      answer: "B"
-    }
   ]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [questionsLoaded, setQuestionsLoaded] = useState(true);
@@ -160,8 +144,9 @@ function App() {
   const slowGlowPhaseRef = useRef(0);
   const slowGlowAlphaRef = useRef(0);
   const tunaImagesRef = useRef({});
+  const bgImageRef = useRef(null);
 
-  // Preload tuna images
+  // Preload tuna images and background
   useEffect(() => {
     const imagesToLoad = [
       'head_up', 'head_down', 'head_left', 'head_right',
@@ -178,29 +163,45 @@ function App() {
       img.src = `${process.env.PUBLIC_URL}/${name}.png`;
       tunaImagesRef.current[name] = img;
     });
+
+    // Load background image
+    const bgImg = new Image();
+    bgImg.src = `${process.env.PUBLIC_URL}/bg.png`;
+    bgImageRef.current = bgImg;
   }, []);
 
-  // Check login status on mount
+  // Check authentication status on mount
   useEffect(() => {
-    const savedUsername = getCookie('username');
-    const firstname = getCookie('firstname');
-    const lastname = getCookie('lastname');
-    const email = getCookie('email');
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include'
+        });
 
-    if (savedUsername && firstname && lastname && email) {
-      setUsername(savedUsername);
-      setIsLoggedIn(true);
-    }
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
   // Load questions and leaderboard
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!user) return;
 
     const loadQuestions = async () => {
       try {
-        // Call Node.js backend API (no base64 decoding needed!)
-        const response = await fetch('/api/questions?folder=comp705-01');
+        // Call Node.js backend API with selected bank
+        const response = await fetch(`/api/questions?folder=${currentBank}`, {
+          credentials: 'include'
+        });
         const data = await response.json();
         if (data && Array.isArray(data) && data.length > 0) {
           setQuestions(data);
@@ -208,6 +209,7 @@ function App() {
         setQuestionsLoaded(true);
       } catch (error) {
         console.error('Failed to load questions:', error);
+        window.alert('Failed to load questions.')
         // Keep default questions - don't overwrite
         setQuestionsLoaded(true);
       }
@@ -215,8 +217,10 @@ function App() {
 
     const loadLeaderboard = async () => {
       try {
-        // Call Node.js backend API
-        const response = await fetch('/api/leaderboard?folder=comp705-01');
+        // Call Node.js backend API with selected bank
+        const response = await fetch(`/api/leaderboard?folder=${currentBank}`, {
+          credentials: 'include'
+        });
         const data = await response.json();
         setLeaderboard(Array.isArray(data) ? data : []);
         setLeaderboardLoaded(true);
@@ -230,7 +234,7 @@ function App() {
 
     loadQuestions();
     loadLeaderboard();
-  }, [isLoggedIn]);
+  }, [user, currentBank]);
 
   // Initialize first question
   useEffect(() => {
@@ -340,6 +344,33 @@ function App() {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Draw background image if loaded
+    if (bgImageRef.current && bgImageRef.current.complete) {
+      ctx.drawImage(bgImageRef.current, 0, 0, canvas.width, canvas.height);
+    }
+
+    // Draw very light grid lines
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'; // Very light, barely visible
+    ctx.lineWidth = 0.5;
+
+    // Draw vertical lines
+    for (let x = 0; x <= canvas.width; x += GRID_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+
+    // Draw horizontal lines
+    for (let y = 0; y <= canvas.height; y += GRID_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+
     // Draw worms
     worms.forEach((worm, i) => {
       ctx.save();
@@ -351,22 +382,88 @@ function App() {
       const cx = worm.x + GRID_SIZE / 2 + dx;
       const cy = worm.y + GRID_SIZE / 2 + dy;
 
-      ctx.shadowColor = worm.color;
-      ctx.shadowBlur = 28;
+      // Get the worms image
+      const wormsImg = tunaImagesRef.current['worms'];
 
-      ctx.beginPath();
-      ctx.arc(cx, cy, GRID_SIZE / 1.85, 0, 2 * Math.PI);
-      ctx.fillStyle = worm.color;
-      ctx.fill();
+      if (wormsImg && wormsImg.complete) {
+        // Apply glow effect using the worm's color
+        ctx.shadowColor = worm.color;
+        ctx.shadowBlur = 35; // Increased glow
 
+        // Make the crab larger
+        const crabSize = GRID_SIZE * 1.5; // 50% larger than grid size
+        const offsetX = (GRID_SIZE - crabSize) / 2; // positioning offset
+        const offsetY = (GRID_SIZE - crabSize) / 2;
+
+        // Create a colored version of the worms image
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = crabSize;
+        tempCanvas.height = crabSize;
+
+        // Draw the original image at larger size
+        tempCtx.drawImage(wormsImg, 0, 0, crabSize, crabSize);
+
+        // Get image data and apply color tint
+        const imageData = tempCtx.getImageData(0, 0, crabSize, crabSize);
+        const data = imageData.data;
+
+        // Parse the worm color (HSL format)
+        const colorMatch = worm.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+        if (colorMatch) {
+          const [, h, s, l] = colorMatch.map(Number);
+
+          // Convert HSL to RGB
+          const hslToRgb = (h, s, l) => {
+            h /= 360;
+            s /= 100;
+            l /= 100;
+            const a = s * Math.min(l, 1 - l);
+            const f = n => {
+              const k = (n + h * 12) % 12;
+              return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+            };
+            return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+          };
+
+          const [r, g, b] = hslToRgb(h, s, l);
+
+          // Apply color tint to non-transparent pixels
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] > 0) { // If pixel is not transparent
+              // Blend the original color with the worm color
+              const alpha = 0.7; // Adjust this to control color intensity
+              data[i] = data[i] * (1 - alpha) + r * alpha;     // Red
+              data[i + 1] = data[i + 1] * (1 - alpha) + g * alpha; // Green
+              data[i + 2] = data[i + 2] * (1 - alpha) + b * alpha; // Blue
+            }
+          }
+
+          tempCtx.putImageData(imageData, 0, 0);
+        }
+
+        // Draw the colored image at larger size
+        ctx.drawImage(tempCanvas, worm.x + dx + offsetX, worm.y + dy + offsetY);
+      } else {
+        // Fallback to original circle drawing if image not loaded
+        ctx.shadowColor = worm.color;
+        ctx.shadowBlur = 28;
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, GRID_SIZE / 1.85, 0, 2 * Math.PI);
+        ctx.fillStyle = worm.color;
+        ctx.fill();
+      }
+
+      // Draw the label on top (same for both image and fallback)
       ctx.shadowColor = "#fff";
-      ctx.shadowBlur = 22;
-      ctx.globalAlpha = 0.92;
-      ctx.font = `bold ${Math.floor(GRID_SIZE * 1.0)}px Segoe UI, Arial`;
+      ctx.shadowBlur = 25;
+      ctx.globalAlpha = 0.95;
+      ctx.font = `bold ${Math.floor(GRID_SIZE * 0.45)}px Segoe UI, Arial`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 4; // Thicker outline
       ctx.strokeStyle = "#ffffff";
       ctx.strokeText(worm.label, cx, cy + 1);
 
@@ -454,10 +551,10 @@ function App() {
     setIsGameOver(true);
 
     const finalEntry = {
-      name: username,
+      name: user.username,
       level: level,
       time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
-      folder: 'comp705-01'
+      folder: currentBank
     };
 
     setLeaderboard(prev => {
@@ -475,7 +572,7 @@ function App() {
     });
 
     setShowSplash(true);
-  }, [username, level, startTime]);
+  }, [user, level, startTime, currentBank]);
 
   // Game loop
   useEffect(() => {
@@ -499,14 +596,14 @@ function App() {
 
           // Update leaderboard
           const newEntry = {
-            name: username,
+            name: user.username,
             level: level + 1,
             time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
-            folder: 'comp705-01'
+            folder: currentBank
           };
 
           setLeaderboard(prev => {
-            const existingIndex = prev.findIndex(e => e.name === username);
+            const existingIndex = prev.findIndex(e => e.name === user.username);
             let updated;
             if (existingIndex !== -1) {
               updated = [...prev];
@@ -621,7 +718,7 @@ function App() {
         cancelAnimationFrame(gameLoopRef.current);
       }
     };
-  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, username, startTime, drawGame, endGame]);
+  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, user, startTime, drawGame, endGame, currentBank]);
 
   const startGame = useCallback(() => {
     if (!questions || questions.length === 0) {
@@ -695,81 +792,62 @@ function App() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [isGameRunning, direction, questionsLoaded, leaderboardLoaded, startGame]);
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-
-    // Save cookies
-    setCookie('username', formData.username);
-    setCookie('firstname', formData.firstname);
-    setCookie('lastname', formData.lastname);
-    setCookie('email', formData.email);
-    setCookie('full_name', `${formData.firstname} ${formData.lastname}`);
-
-    setUsername(formData.username);
-    setIsLoggedIn(true);
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
   };
 
-  // Render login form if not logged in
-  if (!isLoggedIn) {
+  const handleLogout = () => {
+    setUser(null);
+    // Reset game state
+    setLevel(1);
+    setIsGameRunning(false);
+    setIsGameOver(false);
+    setShowSplash(true);
+  };
+
+  const handleBankChange = (bank) => {
+    if (bank && bank.folder) {
+      setCurrentBank(bank.folder);
+      // Reset game when changing banks
+      setLevel(1);
+      setIsGameRunning(false);
+      setIsGameOver(false);
+      setShowSplash(true);
+      setUsedQuestions([]);
+    }
+  };
+
+  // Show loading while checking auth
+  if (isCheckingAuth) {
     return (
       <div style={{
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        minHeight: '100vh'
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        color: '#ffe082',
+        fontSize: '1.5rem'
       }}>
+        Loading...
+      </div>
+    );
+  }
+
+  // Render login form if not authenticated
+  if (!user) {
+    return (
+      <>
         <LanguageSwitcher
           currentLanguage={language}
           onLanguageChange={setLanguage}
           translations={t}
         />
-        <form className="login-form" onSubmit={handleLogin}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '10px', textAlign: 'center' }}>🐍</div>
-          <h2 style={{ color: '#ffe082', textAlign: 'center', marginBottom: '10px' }}>{t.loginWelcome}</h2>
-          <div style={{
-            color: '#81ff81',
-            fontSize: '1.1rem',
-            fontWeight: '600',
-            textAlign: 'center',
-            marginBottom: '20px'
-          }}>
-            {t.loginEnterDetails}
-          </div>
-          <input
-            type="text"
-            placeholder={t.loginUsername}
-            maxLength="30"
-            required
-            value={formData.username}
-            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder={t.loginFirstName}
-            maxLength="30"
-            required
-            value={formData.firstname}
-            onChange={(e) => setFormData({ ...formData, firstname: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder={t.loginLastName}
-            maxLength="30"
-            required
-            value={formData.lastname}
-            onChange={(e) => setFormData({ ...formData, lastname: e.target.value })}
-          />
-          <input
-            type="email"
-            placeholder={t.loginEmail}
-            maxLength="80"
-            required
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          />
-          <button type="submit">{t.loginPlayButton}</button>
-        </form>
-      </div>
+        <LoginPage
+          onLoginSuccess={handleLoginSuccess}
+          translations={t}
+        />
+      </>
     );
   }
 
@@ -783,6 +861,13 @@ function App() {
       <div className="split-container">
         {/* Left Panel */}
         <div className="left-panel">
+          {/* User Panel */}
+          <UserPanel
+            user={user}
+            onLogout={handleLogout}
+            onQuestionBankChange={handleBankChange}
+            translations={t}
+          />
           {/* Question Panel */}
           <div className="question-panel">
             {currentQuestion ? (
@@ -880,7 +965,7 @@ function App() {
               padding: '18px 16px 8px 16px',
               boxShadow: '0 6px 24px #1b2235b3',
             }}>
-              <div style={{
+              <div id="innerLeaderboard" style={{
                 width: '100%',
                 maxHeight: '30vh',
                 overflowY: 'auto',
@@ -911,7 +996,7 @@ function App() {
                       </tr>
                     ) : (
                       leaderboard.map((row, i) => {
-                        const isUser = row.name === username;
+                        const isUser = row.name === user.username;
                         const medal = ['🥇', '🥈', '🥉'];
 
                         return (
@@ -949,6 +1034,16 @@ function App() {
         {/* Right Panel */}
         <div className="right-panel">
           <div className="game-area">
+
+            {/* Question Bank Selector */}
+            <div style={{ marginBottom: '12px' }}>
+              <QuestionBankSelector
+                currentBank={currentBank}
+                onBankChange={handleBankChange}
+                translations={t}
+              />
+            </div>
+
             <div className="game-title">
               🧑‍💻 {t.gameTitle}{' '}
               <span style={{
@@ -957,16 +1052,7 @@ function App() {
                 WebkitTextFillColor: 'transparent',
                 fontWeight: 'bold',
               }}>
-                {username}
-              </span>{' '}
-              {t.gameAtBlock}{' '}
-              <span style={{
-                background: 'linear-gradient(90deg, #ff4081, #7c4dff, #40c4ff)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                fontWeight: 'bold',
-              }}>
-                comp705-01
+                {user.name}
               </span>
             </div>
 
@@ -984,7 +1070,7 @@ function App() {
             {showSplash && (
               <div className="splash">
                 <div style={{ fontSize: '2.1rem', fontWeight: '600', marginBottom: '12px' }}>
-                  {isGameOver ? `${t.splashPlayAgain} ${username}?` : `${t.splashReady} ${username}?`}
+                  {isGameOver ? `${t.splashPlayAgain} ${user.name}?` : `${t.splashReady} ${user.name}?`}
                 </div>
                 <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>
                   {t.splashStartPrompt}
@@ -1006,21 +1092,6 @@ function App() {
             )}
           </div>
         </div>
-      </div>
-
-      <div className="footer-bar">
-        <span>
-          {t.footerMadeBy} <span style={{ color: '#fff', textShadow: '0 0 4px #ea0029cc' }}>AUT</span>
-        </span>
-        {' | '}
-        <a
-          href="/comp705-01/admin.php"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: '#ffe082', textDecoration: 'underline', fontWeight: 'bold' }}
-        >
-          {t.footerAdmin}
-        </a>
       </div>
     </div>
   );

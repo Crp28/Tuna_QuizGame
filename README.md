@@ -18,6 +18,8 @@ This repository contains two implementations of the Snake Quiz Game:
 - **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - How to run and deploy both versions
 - **[COMPARISON.md](COMPARISON.md)** - Detailed comparison between implementations
 - **[VISUAL_TESTING.md](VISUAL_TESTING.md)** - Testing checklist for verification
+- **[USER_ACCOUNTS.md](USER_ACCOUNTS.md)** - ✨ NEW: User authentication and question bank management
+- **[RUNNING_THE_APP.md](RUNNING_THE_APP.md)** - How to run the Node.js backend and React frontend
 
 ## About the Game
 
@@ -31,8 +33,43 @@ Snake Quiz Game is an innovative educational tool that combines the classic Snak
 - ⚡ Progressive difficulty
 - 🎨 Beautiful visual effects
 - 📱 Responsive design
+- 🔐 **NEW**: User authentication (student/admin accounts)
+- 📊 **NEW**: Question bank management (admin feature)
+- 🎯 **NEW**: Selectable question banks per user
 
 ## Getting Started
+
+### Quick Setup (React Version with User Accounts)
+
+1. **Database Setup**
+```bash
+# Create database and run migrations
+mysql -u root -p < SNAKE.sql
+mysql -u root -p SNAKE < migrations/001_add_user_accounts.sql
+```
+
+2. **Backend Setup**
+```bash
+cd backend
+npm install
+cp .env.example .env
+# Edit .env with your database credentials
+npm start
+```
+
+3. **Frontend Setup**
+```bash
+cd react-snake-game
+npm install
+npm start
+```
+
+4. **Access the App**
+- Open http://localhost:3000
+- Register a new account (choose admin for full features)
+- Start playing!
+
+For detailed instructions, see [RUNNING_THE_APP.md](RUNNING_THE_APP.md) and [USER_ACCOUNTS.md](USER_ACCOUNTS.md).
 
 ### Option 1: Original Version (Vanilla JS)
 

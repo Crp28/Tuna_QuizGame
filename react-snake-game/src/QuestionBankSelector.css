@@ -1,0 +1,142 @@
+.question-bank-selector {
+  position: relative;
+  z-index: 100;
+  width: 100%;
+  max-width: 900px;
+  margin-bottom: 10px;
+}
+
+.bank-selector-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #7c4dff 0%, #9575cd 100%);
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(124, 77, 255, 0.3);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bank-selector-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(124, 77, 255, 0.4);
+}
+
+.bank-selector-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bank-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.bank-name {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.bank-arrow {
+  font-size: 0.75rem;
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+.bank-arrow.open {
+  transform: rotate(180deg);
+}
+
+.bank-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #23324a;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  max-height: 400px;
+  overflow-y: auto;
+  animation: dropdown-fade-in 0.2s ease;
+}
+
+@keyframes dropdown-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bank-option {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  border-bottom: 1px solid #2a3f5f;
+}
+
+.bank-option:last-child {
+  border-bottom: none;
+}
+
+.bank-option:hover {
+  background: #2a3f5f;
+}
+
+.bank-option.active {
+  background: #1e2d47;
+  border-left: 4px solid #00c853;
+}
+
+.bank-option-name {
+  color: #ffe082;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.bank-option-info {
+  color: #81ff81;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.bank-option-description {
+  color: #b4eaff;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-top: 6px;
+}
+
+/* Scrollbar styling */
+.bank-dropdown::-webkit-scrollbar {
+  width: 8px;
+}
+
+.bank-dropdown::-webkit-scrollbar-track {
+  background: #16213e;
+  border-radius: 0 8px 8px 0;
+}
+
+.bank-dropdown::-webkit-scrollbar-thumb {
+  background: #7c4dff;
+  border-radius: 4px;
+}
+
+.bank-dropdown::-webkit-scrollbar-thumb:hover {
+  background: #9575cd;
+}
