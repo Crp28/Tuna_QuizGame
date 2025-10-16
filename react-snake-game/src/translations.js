@@ -106,6 +106,18 @@ const translations = {
     leaderboardTime: "Time (s)",
     leaderboardEmpty: "No entries yet.",
 
+    // Practice Mode
+    practiceModeTitle: "Practice Mode Available",
+    practiceModeMessage1: "We noticed you're having some challenges! 🎮",
+    practiceModeMessage2: "Would you like to try Practice Mode?",
+    practiceModeFeatures: "In Practice Mode:",
+    practiceFeatureSlower: "🐢 The snake moves slower, giving you more time to react",
+    practiceFeatureNoScore: "📊 Your scores won't be recorded on the leaderboard",
+    practiceFeatureNoUnlock: "🔒 Levels won't unlock, but you can practice and improve",
+    practiceModeAccept: "Try Practice Mode",
+    practiceModeDecline: "Continue Normal Mode",
+    practiceModeIndicator: "🎯 PRACTICE MODE",
+
     // Footer
     footerMadeBy: "Made by Minh Nguyen @",
     footerAdmin: "Admin: Edit Question Bank",
@@ -219,6 +231,18 @@ const translations = {
     leaderboardLevel: "Taumata",
     leaderboardTime: "Wā (h)",
     leaderboardEmpty: "Kāore anō kia whakauruhia.",
+
+    // Practice Mode
+    practiceModeTitle: "Āwhina Whakaako E Wātea Ana",
+    practiceModeMessage1: "I kite mātou kei te whai wero koe! 🎮",
+    practiceModeMessage2: "E hiahia ana koe ki te whakamātau i te Aratau Whakaako?",
+    practiceModeFeatures: "I roto i te Aratau Whakaako:",
+    practiceFeatureSlower: "🐢 Ka nuku pōturi ake te tuna, ka tuku atu i te wā ki a koe",
+    practiceFeatureNoScore: "📊 Kāore ō piro e tuhia ki te papa tākaro",
+    practiceFeatureNoUnlock: "🔒 Kāore ngā taumata e whakatuwhera, engari ka taea e koe te whakaako",
+    practiceModeAccept: "Whakamātau Aratau Whakaako",
+    practiceModeDecline: "Haere Tonu i te Aratau Māori",
+    practiceModeIndicator: "🎯 ARATAU WHAKAAKO",
 
     // Footer
     footerMadeBy: "I hangaia e Minh Nguyen @",

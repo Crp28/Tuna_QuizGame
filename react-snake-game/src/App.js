@@ -5,6 +5,7 @@ import LanguageSwitcher from './LanguageSwitcher';
 import LoginPage from './LoginPage';
 import UserPanel from './UserPanel';
 import QuestionBankSelector from './QuestionBankSelector';
+import PracticeModePopup from './PracticeModePopup';
 
 const GRID_SIZE = 24;
 const CANVAS_WIDTH = 900;
@@ -137,6 +138,13 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [showNextLevel, setShowNextLevel] = useState(false);
   const [questionAnimationClass, setQuestionAnimationClass] = useState('fade-in');
+
+  // Practice mode state
+  const [isPracticeMode, setIsPracticeMode] = useState(false);
+  const [showPracticeModePopup, setShowPracticeModePopup] = useState(false);
+  const [performanceHistory, setPerformanceHistory] = useState([]);
+  const [currentGameStart, setCurrentGameStart] = useState(null);
+  const [lastMoveTime, setLastMoveTime] = useState(null);
 
   const canvasRef = useRef(null);
   const gameLoopRef = useRef(null);
@@ -550,29 +558,112 @@ function App() {
     setIsGameRunning(false);
     setIsGameOver(true);
 
-    const finalEntry = {
-      name: user.username,
-      level: level,
-      time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
-      folder: currentBank
-    };
+    // Track performance for practice mode detection
+    if (!isPracticeMode && currentGameStart) {
+      const gameEndTime = Date.now();
+      const gameDuration = (gameEndTime - currentGameStart) / 1000; // in seconds
+      const snakeLength = snake.length;
+      const timeSinceLastMove = lastMoveTime ? (gameEndTime - lastMoveTime) / 1000 : 0;
+      
+      const performance = {
+        duration: gameDuration,
+        level: level,
+        snakeLength: snakeLength,
+        timeSinceLastMove: timeSinceLastMove,
+        timestamp: gameEndTime
+      };
+      
+      // Add to performance history (keep last 5 games)
+      setPerformanceHistory(prev => {
+        const updated = [...prev, performance];
+        if (updated.length > 5) {
+          updated.shift();
+        }
+        return updated;
+      });
+      
+      // Check if player is struggling (after at least 3 games)
+      if (performanceHistory.length >= 2) {
+        const recentGames = [...performanceHistory, performance].slice(-3);
+        const isStruggling = detectStrugglingPlayer(recentGames);
+        
+        if (isStruggling) {
+          setShowPracticeModePopup(true);
+        }
+      }
+    }
 
-    setLeaderboard(prev => {
-      const updated = [...prev, finalEntry];
-      updated.sort((a, b) => b.level - a.level || a.time - b.time);
+    // Only save score if not in practice mode
+    if (!isPracticeMode) {
+      const finalEntry = {
+        name: user.username,
+        level: level,
+        time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
+        folder: currentBank
+      };
 
-      // Save to Node.js backend
-      fetch('/api/leaderboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(finalEntry)
-      }).catch(err => console.error('Failed to save score:', err));
+      setLeaderboard(prev => {
+        const updated = [...prev, finalEntry];
+        updated.sort((a, b) => b.level - a.level || a.time - b.time);
 
-      return updated;
-    });
+        // Save to Node.js backend
+        fetch('/api/leaderboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(finalEntry)
+        }).catch(err => console.error('Failed to save score:', err));
+
+        return updated;
+      });
+    }
 
     setShowSplash(true);
-  }, [user, level, startTime, currentBank]);
+  }, [user, level, startTime, currentBank, isPracticeMode, snake.length, currentGameStart, lastMoveTime, performanceHistory]);
+
+  /**
+   * Detect if a player is struggling based on their recent performance
+   * Uses a simple heuristic-based algorithm:
+   * - Short game durations (< 10 seconds)
+   * - Short snake length (< 5)
+   * - Long time without moving (> 3 seconds before death)
+   * - Low level achievement
+   * Returns true if 2+ out of 3 recent games show struggling patterns
+   */
+  const detectStrugglingPlayer = (recentGames) => {
+    let strugglingCount = 0;
+    
+    for (const game of recentGames) {
+      let strugglingIndicators = 0;
+      
+      // Indicator 1: Very short game duration (died very early)
+      if (game.duration < 10) {
+        strugglingIndicators++;
+      }
+      
+      // Indicator 2: Short snake (hit self when snake was still relatively short)
+      if (game.snakeLength < 5 && game.duration > 3) {
+        strugglingIndicators++;
+      }
+      
+      // Indicator 3: Long time without moving (not controlling the tuna)
+      if (game.timeSinceLastMove > 3) {
+        strugglingIndicators++;
+      }
+      
+      // Indicator 4: Low level achievement
+      if (game.level <= 1 && game.duration > 5) {
+        strugglingIndicators++;
+      }
+      
+      // If this game shows 2+ struggling indicators, count it
+      if (strugglingIndicators >= 2) {
+        strugglingCount++;
+      }
+    }
+    
+    // Return true if 2+ out of the last 3 games show struggling
+    return strugglingCount >= 2;
+  };
 
   // Game loop
   useEffect(() => {
@@ -594,34 +685,36 @@ function App() {
         if (worm.isCorrect) {
           setLevel(l => l + 1);
 
-          // Update leaderboard
-          const newEntry = {
-            name: user.username,
-            level: level + 1,
-            time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
-            folder: currentBank
-          };
+          // Only update leaderboard if not in practice mode
+          if (!isPracticeMode) {
+            const newEntry = {
+              name: user.username,
+              level: level + 1,
+              time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
+              folder: currentBank
+            };
 
-          setLeaderboard(prev => {
-            const existingIndex = prev.findIndex(e => e.name === user.username);
-            let updated;
-            if (existingIndex !== -1) {
-              updated = [...prev];
-              updated[existingIndex] = newEntry;
-            } else {
-              updated = [...prev, newEntry];
-            }
-            updated.sort((a, b) => b.level - a.level || a.time - b.time);
+            setLeaderboard(prev => {
+              const existingIndex = prev.findIndex(e => e.name === user.username);
+              let updated;
+              if (existingIndex !== -1) {
+                updated = [...prev];
+                updated[existingIndex] = newEntry;
+              } else {
+                updated = [...prev, newEntry];
+              }
+              updated.sort((a, b) => b.level - a.level || a.time - b.time);
 
-            // Save to Node.js backend
-            fetch('/api/leaderboard', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(newEntry)
-            }).catch(err => console.error('Failed to save score:', err));
+              // Save to Node.js backend
+              fetch('/api/leaderboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newEntry)
+              }).catch(err => console.error('Failed to save score:', err));
 
-            return updated;
-          });
+              return updated;
+            });
+          }
 
           // Next question
           const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestions);
@@ -639,8 +732,8 @@ function App() {
           setIsSlow(true);
           setTimeout(() => setIsSlow(false), 2000);
 
-          // Check for next level
-          if (newUsed.length >= Math.ceil(questions.length / 2)) {
+          // Check for next level (only if not in practice mode)
+          if (!isPracticeMode && newUsed.length >= Math.ceil(questions.length / 2)) {
             setShowNextLevel(true);
           }
 
@@ -672,7 +765,9 @@ function App() {
       const now = Date.now();
       if (!lastStepTimeRef.current) lastStepTimeRef.current = now;
 
-      const stepDelay = isSlow ? 340 : Math.max(MIN_STEP_DELAY, START_STEP_DELAY - 2 * level);
+      // Practice mode has much slower speed (additional +80ms to base delay)
+      const baseDelay = isSlow ? 340 : Math.max(MIN_STEP_DELAY, START_STEP_DELAY - 2 * level);
+      const stepDelay = isPracticeMode ? baseDelay + 80 : baseDelay;
 
       const fadeSpeed = 0.09;
       if (isSlow) {
@@ -688,6 +783,7 @@ function App() {
       } else if (awaitingInitialMove) {
         setDirection(nextDir);
         setAwaitingInitialMove(false);
+        setLastMoveTime(now); // Track first move
       }
 
       while (now - lastStepTimeRef.current >= stepDelay) {
@@ -718,7 +814,7 @@ function App() {
         cancelAnimationFrame(gameLoopRef.current);
       }
     };
-  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, user, startTime, drawGame, endGame, currentBank]);
+  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, user, startTime, drawGame, endGame, currentBank, isPracticeMode]);
 
   const startGame = useCallback(() => {
     if (!questions || questions.length === 0) {
@@ -737,6 +833,8 @@ function App() {
     setLevel(1);
     setUsedQuestions([]);
     setStartTime(Date.now());
+    setCurrentGameStart(Date.now());
+    setLastMoveTime(null);
     lastStepTimeRef.current = 0;
     setAwaitingInitialMove(true);
     setShowSplash(false);
@@ -765,6 +863,17 @@ function App() {
     setIsGameRunning(true);
   }, [questions]);
 
+  const handlePracticeModeAccept = () => {
+    setIsPracticeMode(true);
+    setShowPracticeModePopup(false);
+    // Don't auto-start the game, let user press S
+  };
+
+  const handlePracticeModeDecline = () => {
+    setShowPracticeModePopup(false);
+    // Continue in normal mode
+  };
+
   // Handle keyboard input
   useEffect(() => {
     const handleKey = (e) => {
@@ -779,12 +888,16 @@ function App() {
 
       if ((key === 'arrowup' || key === 'w') && direction.y === 0) {
         setNextDir({ x: 0, y: -GRID_SIZE });
+        setLastMoveTime(Date.now());
       } else if ((key === 'arrowdown' || key === 's') && direction.y === 0) {
         setNextDir({ x: 0, y: GRID_SIZE });
+        setLastMoveTime(Date.now());
       } else if ((key === 'arrowleft' || key === 'a') && direction.x === 0) {
         setNextDir({ x: -GRID_SIZE, y: 0 });
+        setLastMoveTime(Date.now());
       } else if ((key === 'arrowright' || key === 'd') && direction.x === 0) {
         setNextDir({ x: GRID_SIZE, y: 0 });
+        setLastMoveTime(Date.now());
       }
     };
 
@@ -1056,6 +1169,22 @@ function App() {
               </span>
             </div>
 
+            {isPracticeMode && (
+              <div style={{
+                background: 'linear-gradient(135deg, #ff9800 0%, #f44336 100%)',
+                color: '#ffffff',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                fontSize: '0.95rem',
+                fontWeight: 'bold',
+                textAlign: 'center',
+                marginBottom: '8px',
+                boxShadow: '0 2px 8px rgba(255, 152, 0, 0.4)'
+              }}>
+                {t.practiceModeIndicator}
+              </div>
+            )}
+
             <div className="score">
               {t.gameLevel} {level} | {t.gameTime} {gameTime.toFixed(1)} s
             </div>
@@ -1093,6 +1222,15 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Practice Mode Popup */}
+      {showPracticeModePopup && (
+        <PracticeModePopup
+          onAccept={handlePracticeModeAccept}
+          onDecline={handlePracticeModeDecline}
+          translations={t}
+        />
+      )}
     </div>
   );
 }
