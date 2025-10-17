@@ -849,6 +849,7 @@ function App() {
     ]);
     setDirection({ x: 0, y: 0 });
     setNextDir({ x: 0, y: 0 });
+    directionRef.current = { x: 0, y: 0 };
     inputQueueRef.current = []; // Reset input queue
     setIsGameOver(false);
     setLevel(1);
@@ -933,25 +934,24 @@ function App() {
       if (newDir) {
         setLastMoveTime(Date.now());
         
-        // Get the effective current direction - either from queue or current direction
+        // Get the effective direction (last queued or current)
         const queue = inputQueueRef.current;
         const effectiveDir = queue.length > 0 ? queue[queue.length - 1] : directionRef.current;
         
-        // Check if this is the initial move (no direction set yet)
-        const isInitialMove = effectiveDir.x === 0 && effectiveDir.y === 0;
+        // Validate the move: can't go opposite direction
+        // If moving vertically (y !== 0), can only change to horizontal (newDir.y === 0)
+        // If moving horizontally (x !== 0), can only change to vertical (newDir.x === 0)
+        const isValidMove = (effectiveDir.y !== 0 && newDir.y === 0) || 
+                           (effectiveDir.x !== 0 && newDir.x === 0);
         
-        // Check if new direction is perpendicular to effective direction (valid move)
-        // Not opposite means: if moving horizontally, can only go vertical, and vice versa
-        const isValidMove = isInitialMove || 
-                           (effectiveDir.x !== 0 && newDir.x === 0) || 
-                           (effectiveDir.y !== 0 && newDir.y === 0);
-        
-        // Also check it's not the same direction already queued
+        // Check if it's the same direction
         const isSame = (effectiveDir.x === newDir.x && effectiveDir.y === newDir.y);
         
         if (isValidMove && !isSame) {
-          // Clear queue and add new direction to ensure responsiveness
-          inputQueueRef.current = [newDir];
+          // Add to queue (max 3 for smooth continuous turns)
+          if (queue.length < 3) {
+            inputQueueRef.current.push(newDir);
+          }
         }
       }
     };
