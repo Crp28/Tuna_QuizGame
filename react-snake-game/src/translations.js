@@ -118,6 +118,7 @@ const translations = {
     practiceModeDecline: "Continue Normal Mode",
     practiceModeIndicator: "🎯 PRACTICE MODE",
     exitPracticeMode: "Exit Practice",
+    practiceDontShowAgain: "Don't show this again",
 
     // Footer
     footerMadeBy: "Made by Minh Nguyen @",
@@ -245,6 +246,7 @@ const translations = {
     practiceModeDecline: "Haere Tonu i te Aratau Māori",
     practiceModeIndicator: "🎯 ARATAU WHAKAAKO",
     exitPracticeMode: "Puta Whakaako",
+    practiceDontShowAgain: "Kaua e whakaatu anō",
 
     // Footer
     footerMadeBy: "I hangaia e Minh Nguyen @",

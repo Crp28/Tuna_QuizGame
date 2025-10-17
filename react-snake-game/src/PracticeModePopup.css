@@ -98,6 +98,34 @@
   align-items: center;
 }
 
+.practice-checkbox {
+  margin: 20px 0 0 0;
+  padding: 12px;
+  background: rgba(22, 33, 62, 0.5);
+  border-radius: 8px;
+  border: 1px solid #2a3f5f;
+}
+
+.practice-checkbox label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #ffe082;
+  font-size: 0.95rem;
+}
+
+.practice-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-right: 10px;
+  cursor: pointer;
+  accent-color: #ff4081;
+}
+
+.practice-checkbox span {
+  user-select: none;
+}
+
 .practice-mode-actions {
   display: flex;
   gap: 12px;

@@ -143,6 +143,7 @@ function App() {
   // Practice mode state
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [showPracticeModePopup, setShowPracticeModePopup] = useState(false);
+  const [practiceModeDisabled, setPracticeModeDisabled] = useState(false);
   const [performanceHistory, setPerformanceHistory] = useState([]);
   const [currentGameStart, setCurrentGameStart] = useState(null);
   const [lastMoveTime, setLastMoveTime] = useState(null);
@@ -584,8 +585,8 @@ function App() {
         return updated;
       });
       
-      // Check if player is struggling (after at least 3 games)
-      if (performanceHistory.length >= 2) {
+      // Check if player is struggling (after at least 3 games) and popup not disabled
+      if (performanceHistory.length >= 2 && !practiceModeDisabled) {
         const recentGames = [...performanceHistory, performance].slice(-3);
         const isStruggling = detectStrugglingPlayer(recentGames);
         
@@ -620,7 +621,7 @@ function App() {
     }
 
     setShowSplash(true);
-  }, [user, level, startTime, currentBank, isPracticeMode, snake.length, currentGameStart, lastMoveTime, performanceHistory]);
+  }, [user, level, startTime, currentBank, isPracticeMode, snake.length, currentGameStart, lastMoveTime, performanceHistory, practiceModeDisabled]);
 
   /**
    * Detect if a player is struggling based on their recent performance
@@ -798,15 +799,11 @@ function App() {
       }
 
       while (now - lastStepTimeRef.current >= stepDelay) {
-        // Process input queue before moving
+        // Process input queue before moving - apply direction immediately
         if (inputQueueRef.current.length > 0) {
           const queuedDir = inputQueueRef.current.shift();
-          // Validate against current direction to prevent invalid moves
-          const currentDir = directionRef.current;
-          const isOpposite = (currentDir.x === -queuedDir.x && currentDir.y === -queuedDir.y);
-          if (!isOpposite) {
-            setNextDir(queuedDir);
-          }
+          setNextDir(queuedDir);
+          directionRef.current = queuedDir;
         }
         
         if (!moveSnake()) return;
@@ -887,14 +884,20 @@ function App() {
     setIsGameRunning(true);
   }, [questions]);
 
-  const handlePracticeModeAccept = () => {
+  const handlePracticeModeAccept = (dontShowAgain) => {
     setIsPracticeMode(true);
     setShowPracticeModePopup(false);
+    if (dontShowAgain) {
+      setPracticeModeDisabled(true);
+    }
     // Don't auto-start the game, let user press S
   };
 
-  const handlePracticeModeDecline = () => {
+  const handlePracticeModeDecline = (dontShowAgain) => {
     setShowPracticeModePopup(false);
+    if (dontShowAgain) {
+      setPracticeModeDisabled(true);
+    }
     // Continue in normal mode
   };
 
@@ -930,20 +933,21 @@ function App() {
       if (newDir) {
         setLastMoveTime(Date.now());
         
-        // Add to input queue if it doesn't conflict with the last queued direction
+        // Get the effective current direction - either from queue or current direction
         const queue = inputQueueRef.current;
-        const currentDir = directionRef.current;
-        const lastQueuedDir = queue.length > 0 ? queue[queue.length - 1] : currentDir;
+        const effectiveDir = queue.length > 0 ? queue[queue.length - 1] : directionRef.current;
         
-        // Check if new direction is valid (not opposite and not same)
-        const isOpposite = (lastQueuedDir.x === -newDir.x && lastQueuedDir.y === -newDir.y);
-        const isSame = (lastQueuedDir.x === newDir.x && lastQueuedDir.y === newDir.y);
+        // Check if new direction is perpendicular to effective direction (valid move)
+        // Not opposite means: if moving horizontally, can only go vertical, and vice versa
+        const isValidMove = (effectiveDir.x !== 0 && newDir.x === 0) || 
+                           (effectiveDir.y !== 0 && newDir.y === 0);
         
-        if (!isOpposite && !isSame) {
-          // Limit queue to 2 inputs to prevent excessive buffering
-          if (queue.length < 2) {
-            inputQueueRef.current.push(newDir);
-          }
+        // Also check it's not the same direction already queued
+        const isSame = (effectiveDir.x === newDir.x && effectiveDir.y === newDir.y);
+        
+        if (isValidMove && !isSame) {
+          // Clear queue and add new direction to ensure responsiveness
+          inputQueueRef.current = [newDir];
         }
       }
     };
