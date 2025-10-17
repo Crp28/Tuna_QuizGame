@@ -156,6 +156,7 @@ function App() {
   const tunaImagesRef = useRef({});
   const bgImageRef = useRef(null);
   const directionRef = useRef({ x: 0, y: 0 });
+  const nextDirRef = useRef({ x: 0, y: 0 });
 
   // Preload tuna images and background
   useEffect(() => {
@@ -799,10 +800,11 @@ function App() {
       }
 
       while (now - lastStepTimeRef.current >= stepDelay) {
-        // Process input queue before moving - apply direction immediately
+        // Process input queue before moving
         if (inputQueueRef.current.length > 0) {
           const queuedDir = inputQueueRef.current.shift();
           setNextDir(queuedDir);
+          nextDirRef.current = queuedDir;
           directionRef.current = queuedDir;
         }
         
@@ -850,6 +852,7 @@ function App() {
     setDirection({ x: 0, y: 0 });
     setNextDir({ x: 0, y: 0 });
     directionRef.current = { x: 0, y: 0 };
+    nextDirRef.current = { x: 0, y: 0 };
     inputQueueRef.current = []; // Reset input queue
     setIsGameOver(false);
     setLevel(1);
@@ -934,9 +937,11 @@ function App() {
       if (newDir) {
         setLastMoveTime(Date.now());
         
-        // Get the effective direction (last queued or current)
+        // Get the effective direction (last queued, nextDir, or current)
         const queue = inputQueueRef.current;
-        const effectiveDir = queue.length > 0 ? queue[queue.length - 1] : directionRef.current;
+        const effectiveDir = queue.length > 0 ? queue[queue.length - 1] : 
+                            (nextDirRef.current.x !== 0 || nextDirRef.current.y !== 0) ? nextDirRef.current :
+                            directionRef.current;
         
         // Validate the move: can't go opposite direction
         // If moving vertically (y !== 0), can only change to horizontal (newDir.y === 0)
@@ -948,8 +953,13 @@ function App() {
         const isSame = (effectiveDir.x === newDir.x && effectiveDir.y === newDir.y);
         
         if (isValidMove && !isSame) {
-          // Add to queue (max 3 for smooth continuous turns)
-          if (queue.length < 3) {
+          // If queue is empty, set nextDir immediately for instant response
+          if (queue.length === 0) {
+            setNextDir(newDir);
+            nextDirRef.current = newDir;
+          }
+          // Add to queue for buffering (max 2 additional inputs)
+          if (queue.length < 2) {
             inputQueueRef.current.push(newDir);
           }
         }
