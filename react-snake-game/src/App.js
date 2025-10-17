@@ -937,9 +937,13 @@ function App() {
         const queue = inputQueueRef.current;
         const effectiveDir = queue.length > 0 ? queue[queue.length - 1] : directionRef.current;
         
+        // Check if this is the initial move (no direction set yet)
+        const isInitialMove = effectiveDir.x === 0 && effectiveDir.y === 0;
+        
         // Check if new direction is perpendicular to effective direction (valid move)
         // Not opposite means: if moving horizontally, can only go vertical, and vice versa
-        const isValidMove = (effectiveDir.x !== 0 && newDir.x === 0) || 
+        const isValidMove = isInitialMove || 
+                           (effectiveDir.x !== 0 && newDir.x === 0) || 
                            (effectiveDir.y !== 0 && newDir.y === 0);
         
         // Also check it's not the same direction already queued
