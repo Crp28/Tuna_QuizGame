@@ -125,6 +125,7 @@ function App() {
   ]);
   const [direction, setDirection] = useState({ x: 0, y: 0 });
   const [nextDir, setNextDir] = useState({ x: 0, y: 0 });
+  const inputQueueRef = useRef([]);
   const [worms, setWorms] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [isGameRunning, setIsGameRunning] = useState(false);
@@ -153,6 +154,7 @@ function App() {
   const slowGlowAlphaRef = useRef(0);
   const tunaImagesRef = useRef({});
   const bgImageRef = useRef(null);
+  const directionRef = useRef({ x: 0, y: 0 });
 
   // Preload tuna images and background
   useEffect(() => {
@@ -778,15 +780,35 @@ function App() {
         slowGlowPhaseRef.current = 0;
       }
 
-      if (awaitingInitialMove && (nextDir.x === 0 && nextDir.y === 0)) {
+      if (awaitingInitialMove && (nextDir.x === 0 && nextDir.y === 0) && inputQueueRef.current.length === 0) {
         return;
       } else if (awaitingInitialMove) {
-        setDirection(nextDir);
+        // Consume from queue if available, otherwise use nextDir
+        if (inputQueueRef.current.length > 0) {
+          const queuedDir = inputQueueRef.current.shift();
+          setNextDir(queuedDir);
+          setDirection(queuedDir);
+          directionRef.current = queuedDir;
+        } else {
+          setDirection(nextDir);
+          directionRef.current = nextDir;
+        }
         setAwaitingInitialMove(false);
         setLastMoveTime(now); // Track first move
       }
 
       while (now - lastStepTimeRef.current >= stepDelay) {
+        // Process input queue before moving
+        if (inputQueueRef.current.length > 0) {
+          const queuedDir = inputQueueRef.current.shift();
+          // Validate against current direction to prevent invalid moves
+          const currentDir = directionRef.current;
+          const isOpposite = (currentDir.x === -queuedDir.x && currentDir.y === -queuedDir.y);
+          if (!isOpposite) {
+            setNextDir(queuedDir);
+          }
+        }
+        
         if (!moveSnake()) return;
         if (checkCollision()) {
           endGame();
@@ -794,6 +816,7 @@ function App() {
         }
         // Update direction after the snake moves
         setDirection(nextDir);
+        directionRef.current = nextDir;
         lastStepTimeRef.current += stepDelay;
       }
     };
@@ -829,6 +852,7 @@ function App() {
     ]);
     setDirection({ x: 0, y: 0 });
     setNextDir({ x: 0, y: 0 });
+    inputQueueRef.current = []; // Reset input queue
     setIsGameOver(false);
     setLevel(1);
     setUsedQuestions([]);
@@ -874,6 +898,11 @@ function App() {
     // Continue in normal mode
   };
 
+  const handleExitPracticeMode = () => {
+    setIsPracticeMode(false);
+    // Don't restart game, just switch mode
+  };
+
   // Handle keyboard input
   useEffect(() => {
     const handleKey = (e) => {
@@ -885,25 +914,43 @@ function App() {
       }
 
       const key = e.key.toLowerCase();
+      let newDir = null;
 
-      if ((key === 'arrowup' || key === 'w') && direction.y === 0) {
-        setNextDir({ x: 0, y: -GRID_SIZE });
+      // Determine the new direction based on key press
+      if (key === 'arrowup' || key === 'w') {
+        newDir = { x: 0, y: -GRID_SIZE };
+      } else if (key === 'arrowdown' || key === 's') {
+        newDir = { x: 0, y: GRID_SIZE };
+      } else if (key === 'arrowleft' || key === 'a') {
+        newDir = { x: -GRID_SIZE, y: 0 };
+      } else if (key === 'arrowright' || key === 'd') {
+        newDir = { x: GRID_SIZE, y: 0 };
+      }
+
+      if (newDir) {
         setLastMoveTime(Date.now());
-      } else if ((key === 'arrowdown' || key === 's') && direction.y === 0) {
-        setNextDir({ x: 0, y: GRID_SIZE });
-        setLastMoveTime(Date.now());
-      } else if ((key === 'arrowleft' || key === 'a') && direction.x === 0) {
-        setNextDir({ x: -GRID_SIZE, y: 0 });
-        setLastMoveTime(Date.now());
-      } else if ((key === 'arrowright' || key === 'd') && direction.x === 0) {
-        setNextDir({ x: GRID_SIZE, y: 0 });
-        setLastMoveTime(Date.now());
+        
+        // Add to input queue if it doesn't conflict with the last queued direction
+        const queue = inputQueueRef.current;
+        const currentDir = directionRef.current;
+        const lastQueuedDir = queue.length > 0 ? queue[queue.length - 1] : currentDir;
+        
+        // Check if new direction is valid (not opposite and not same)
+        const isOpposite = (lastQueuedDir.x === -newDir.x && lastQueuedDir.y === -newDir.y);
+        const isSame = (lastQueuedDir.x === newDir.x && lastQueuedDir.y === newDir.y);
+        
+        if (!isOpposite && !isSame) {
+          // Limit queue to 2 inputs to prevent excessive buffering
+          if (queue.length < 2) {
+            inputQueueRef.current.push(newDir);
+          }
+        }
       }
     };
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [isGameRunning, direction, questionsLoaded, leaderboardLoaded, startGame]);
+  }, [isGameRunning, questionsLoaded, leaderboardLoaded, startGame]);
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
@@ -1169,24 +1216,48 @@ function App() {
               </span>
             </div>
 
-            {isPracticeMode && (
-              <div style={{
-                background: 'linear-gradient(135deg, #ff9800 0%, #f44336 100%)',
-                color: '#ffffff',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                fontSize: '0.95rem',
-                fontWeight: 'bold',
-                textAlign: 'center',
-                marginBottom: '8px',
-                boxShadow: '0 2px 8px rgba(255, 152, 0, 0.4)'
-              }}>
-                {t.practiceModeIndicator}
-              </div>
-            )}
-
-            <div className="score">
-              {t.gameLevel} {level} | {t.gameTime} {gameTime.toFixed(1)} s
+            <div className="score" style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}>
+              <span>{t.gameLevel} {level} | {t.gameTime} {gameTime.toFixed(1)} s</span>
+              {isPracticeMode && (
+                <>
+                  <span style={{
+                    background: 'linear-gradient(135deg, #ff9800 0%, #f44336 100%)',
+                    color: '#ffffff',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                    boxShadow: '0 2px 6px rgba(255, 152, 0, 0.3)'
+                  }}>
+                    {t.practiceModeIndicator}
+                  </span>
+                  <button
+                    onClick={handleExitPracticeMode}
+                    style={{
+                      background: 'linear-gradient(135deg, #00c853 0%, #64dd17 100%)',
+                      color: '#ffffff',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold',
+                      border: 'none',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0, 200, 83, 0.3)',
+                      transition: 'transform 0.2s ease'
+                    }}
+                    onMouseOver={(e) => e.target.style.transform = 'translateY(-1px)'}
+                    onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+                  >
+                    {t.exitPracticeMode}
+                  </button>
+                </>
+              )}
             </div>
 
             <canvas
