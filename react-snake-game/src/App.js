@@ -168,7 +168,6 @@ function App() {
   const explosionStartRef = useRef(0);
   const explosionSegmentsRef = useRef([]);
   const shakeStartRef = useRef(0);
-  const splashTimeoutRef = useRef(null);
 
   // Authoritative high-frequency game state (refs)
   const snakeRef = useRef([
@@ -766,9 +765,9 @@ function App() {
     }
 
     // Delay showing splash until after explosion completes
-    splashTimeoutRef.current = setTimeout(() => {
+    setTimeout(() => {
       setShowSplash(true);
-      splashTimeoutRef.current = null;
+      isExplodingRef.current = false; // Allow input after splash is shown
     }, 1100);
   }, [user, currentGameStart, lastMoveTime, performanceHistory, practiceModeDisabled, isPracticeMode, currentBank, explosionLoop]);
 
@@ -963,11 +962,8 @@ function App() {
       return;
     }
 
-    // Clear any pending splash screen timeout from previous game
-    if (splashTimeoutRef.current) {
-      clearTimeout(splashTimeoutRef.current);
-      splashTimeoutRef.current = null;
-    }
+    // Reset explosion state
+    isExplodingRef.current = false;
 
     // Initialize refs
     const initialSnake = [
@@ -1038,6 +1034,11 @@ function App() {
     const isSame = (a, b) => (a.x === b.x && a.y === b.y);
 
     const handleKey = (e) => {
+      // Block all input during explosion animation
+      if (isExplodingRef.current) {
+        return;
+      }
+
       if (!isGameRunning) {
         if (e.key.toLowerCase() === 's' && questionsLoaded && leaderboardLoaded) {
           startGame();
