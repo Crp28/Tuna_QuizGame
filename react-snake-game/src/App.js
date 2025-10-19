@@ -995,6 +995,7 @@ function App() {
     setAwaitingInitialMove(true);
     setShowSplash(false);
     setShowNextLevel(false);
+    setShowPracticeModePopup(false); // Close practice mode popup if open
 
     const { question, usedQuestions: newUsed } = getRandomQuestion(questions, []);
     if (!question) {
