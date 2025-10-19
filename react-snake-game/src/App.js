@@ -767,6 +767,7 @@ function App() {
     // Delay showing splash until after explosion completes
     setTimeout(() => {
       setShowSplash(true);
+      isExplodingRef.current = false; // Allow input after splash is shown
     }, 1100);
   }, [user, currentGameStart, lastMoveTime, performanceHistory, practiceModeDisabled, isPracticeMode, currentBank, explosionLoop]);
 
@@ -961,6 +962,9 @@ function App() {
       return;
     }
 
+    // Reset explosion state
+    isExplodingRef.current = false;
+
     // Initialize refs
     const initialSnake = [
       { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
@@ -987,6 +991,7 @@ function App() {
     setAwaitingInitialMove(true);
     setShowSplash(false);
     setShowNextLevel(false);
+    setShowPracticeModePopup(false); // Close practice mode popup if open
 
     const { question, usedQuestions: newUsed } = getRandomQuestion(questions, []);
     if (!question) {
@@ -1029,6 +1034,11 @@ function App() {
     const isSame = (a, b) => (a.x === b.x && a.y === b.y);
 
     const handleKey = (e) => {
+      // Block all input during explosion animation
+      if (isExplodingRef.current) {
+        return;
+      }
+
       if (!isGameRunning) {
         if (e.key.toLowerCase() === 's' && questionsLoaded && leaderboardLoaded) {
           startGame();

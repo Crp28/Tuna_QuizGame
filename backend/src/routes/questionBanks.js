@@ -306,7 +306,7 @@ router.post('/:folder/questions', requireAdmin, async (req, res) => {
 
 /**
  * DELETE /api/question-banks/:folder
- * Delete a question bank (admin only)
+ * Delete a question bank and its associated leaderboard data (admin only)
  */
 router.delete('/:folder', requireAdmin, async (req, res) => {
   try {
@@ -324,6 +324,9 @@ router.delete('/:folder', requireAdmin, async (req, res) => {
         error: 'Question bank not found' 
       });
     }
+    
+    // Delete associated leaderboard data first
+    await db.query('DELETE FROM leaderboard WHERE folder = ?', [folder]);
     
     // Delete question bank
     await db.query('DELETE FROM question_sets WHERE folder = ?', [folder]);
