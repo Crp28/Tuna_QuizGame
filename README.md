@@ -63,7 +63,9 @@ cd Tuna_QuizGame
 
 Create the database and tables using the provided SQL file:
 ```bash
-mysql -u root -p < TUNA.sql
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS SNAKE;"
+mysql -u root -p SNAKE < TUNA.sql
+
 ```
 
 Notes:
