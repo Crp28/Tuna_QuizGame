@@ -622,8 +622,9 @@ function App() {
       ctx.restore();
     });
 
-    // Snake
-    snakeToDraw.forEach((segment, idx) => {
+    // Snake (don't draw if exploding - explosion segments will be drawn instead)
+    if (!isExplodingRef.current) {
+      snakeToDraw.forEach((segment, idx) => {
       ctx.save();
 
       const imageName = getTunaImage(segment, idx, snakeToDraw);
@@ -667,6 +668,7 @@ function App() {
       }
       ctx.restore();
     });
+    }
   }, [getTunaImage]);
 
   // Update game time
@@ -681,6 +683,9 @@ function App() {
 
   // End game callback (reads refs)
   const endGame = useCallback(() => {
+    // Prevent multiple explosion triggers
+    if (isExplodingRef.current) return;
+    
     // Don't stop game rendering yet - keep drawing background/worms
     setIsGameOver(true);
     
