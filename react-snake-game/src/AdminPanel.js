@@ -11,6 +11,7 @@ function AdminPanel({ onClose, translations }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [bankToDelete, setBankToDelete] = useState(null); // Track bank being deleted
 
   // Create bank form
   const [createForm, setCreateForm] = useState({
@@ -39,6 +40,7 @@ function AdminPanel({ onClose, translations }) {
     createBankTab: 'Create Bank',
     addQuestionsTab: 'Add Questions',
     bulkUploadTab: 'Bulk Upload',
+    manageBanksTab: 'Manage Banks',
     close: 'Close',
     folder: 'Folder ID',
     name: 'Bank Name',
@@ -62,7 +64,15 @@ function AdminPanel({ onClose, translations }) {
     loading: 'Loading...',
     bankName: 'Bank Name',
     questionPlaceholder: 'Enter your question here...',
-    optionPlaceholder: 'Enter option text...'
+    optionPlaceholder: 'Enter option text...',
+    manageBanksTitle: 'Manage Question Banks',
+    questionCount: 'Questions',
+    deleteBank: 'Delete',
+    confirmDeleteTitle: 'Confirm Delete',
+    confirmDeleteMessage: 'Are you sure you want to delete this question bank? This will also delete all leaderboard data for this bank. This action cannot be undone.',
+    confirmDeleteButton: 'Yes, Delete',
+    cancelButton: 'Cancel',
+    deleteBankSuccess: 'Question bank deleted successfully'
   };
 
   useEffect(() => {
@@ -273,6 +283,33 @@ function AdminPanel({ onClose, translations }) {
     reader.readAsText(file);
   };
 
+  const handleDeleteBank = async (folder) => {
+    setError('');
+    setSuccess('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`/api/question-banks/${folder}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete question bank');
+      }
+
+      setSuccess(t.deleteBankSuccess);
+      setBankToDelete(null);
+      loadQuestionBanks();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="admin-panel-overlay" onClick={onClose}>
       <div className="admin-panel-modal" onClick={(e) => e.stopPropagation()}>
@@ -311,6 +348,16 @@ function AdminPanel({ onClose, translations }) {
             }}
           >
             {t.bulkUploadTab}
+          </button>
+          <button
+            className={`tab ${activeTab === 'manage' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('manage');
+              setError('');
+              setSuccess('');
+            }}
+          >
+            {t.manageBanksTab}
           </button>
         </div>
 
@@ -469,7 +516,7 @@ function AdminPanel({ onClose, translations }) {
                 {isLoading ? t.loading : t.addQuestionButton}
               </button>
             </form>
-          ) : (
+          ) : activeTab === 'bulk' ? (
             <form className="admin-form" onSubmit={handleBulkUpload}>
               <div className="form-group">
                 <label htmlFor="bulk-bank-select">{t.selectBank}</label>
@@ -529,8 +576,74 @@ function AdminPanel({ onClose, translations }) {
                 {isLoading ? t.loading : t.bulkUploadButton}
               </button>
             </form>
-          )}
+          ) : activeTab === 'manage' ? (
+            <div className="manage-banks-section">
+              <h3 style={{ color: '#ffe082', marginBottom: '20px' }}>{t.manageBanksTitle}</h3>
+              
+              {banks.length === 0 ? (
+                <div style={{ color: '#aaa', textAlign: 'center', padding: '40px' }}>
+                  No question banks available
+                </div>
+              ) : (
+                <div className="banks-list">
+                  {banks.map((bank) => (
+                    <div key={bank.id} className="bank-row">
+                      <div className="bank-info">
+                        <div className="bank-name">{bank.name}</div>
+                        <div className="bank-details">
+                          <span className="bank-folder">{bank.folder}</span>
+                          {bank.description && (
+                            <span className="bank-description"> - {bank.description}</span>
+                          )}
+                        </div>
+                        <div className="bank-meta">
+                          {t.questionCount}: {bank.question_count || 0}
+                        </div>
+                      </div>
+                      <button
+                        className="delete-bank-button"
+                        onClick={() => setBankToDelete(bank)}
+                        disabled={isLoading}
+                        title={t.deleteBank}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {bankToDelete && (
+          <div className="confirm-modal-overlay" onClick={() => setBankToDelete(null)}>
+            <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+              <h3>{t.confirmDeleteTitle}</h3>
+              <p>{t.confirmDeleteMessage}</p>
+              <div className="bank-to-delete">
+                <strong>{bankToDelete.name}</strong> ({bankToDelete.folder})
+              </div>
+              <div className="confirm-modal-buttons">
+                <button
+                  className="confirm-delete-button"
+                  onClick={() => handleDeleteBank(bankToDelete.folder)}
+                  disabled={isLoading}
+                >
+                  {isLoading ? t.loading : t.confirmDeleteButton}
+                </button>
+                <button
+                  className="cancel-button"
+                  onClick={() => setBankToDelete(null)}
+                  disabled={isLoading}
+                >
+                  {t.cancelButton}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
