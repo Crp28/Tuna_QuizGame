@@ -168,6 +168,7 @@ function App() {
   const explosionStartRef = useRef(0);
   const explosionSegmentsRef = useRef([]);
   const shakeStartRef = useRef(0);
+  const splashTimeoutRef = useRef(null);
 
   // Authoritative high-frequency game state (refs)
   const snakeRef = useRef([
@@ -765,8 +766,9 @@ function App() {
     }
 
     // Delay showing splash until after explosion completes
-    setTimeout(() => {
+    splashTimeoutRef.current = setTimeout(() => {
       setShowSplash(true);
+      splashTimeoutRef.current = null;
     }, 1100);
   }, [user, currentGameStart, lastMoveTime, performanceHistory, practiceModeDisabled, isPracticeMode, currentBank, explosionLoop]);
 
@@ -959,6 +961,12 @@ function App() {
     if (!questions || questions.length === 0) {
       console.error('No questions available');
       return;
+    }
+
+    // Clear any pending splash screen timeout from previous game
+    if (splashTimeoutRef.current) {
+      clearTimeout(splashTimeoutRef.current);
+      splashTimeoutRef.current = null;
     }
 
     // Initialize refs
