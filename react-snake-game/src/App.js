@@ -288,6 +288,123 @@ function App() {
     }
   }, [questions, currentQuestion]);
 
+  // Helper function to draw background and worms (used during explosion)
+  const drawBackgroundAndWorms = useCallback((ctx) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Background
+    if (bgImageRef.current && bgImageRef.current.complete) {
+      ctx.drawImage(bgImageRef.current, 0, 0, canvas.width, canvas.height);
+    }
+
+    // Very light grid
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 0.5;
+
+    for (let x = 0; x <= canvas.width; x += GRID_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+
+    for (let y = 0; y <= canvas.height; y += GRID_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    const wormsToDraw = wormsRef.current || [];
+    const awaiting = awaitingInitialMoveRef.current;
+
+    // Worms
+    wormsToDraw.forEach((worm, i) => {
+      ctx.save();
+
+      const t = Date.now() / 600 + i;
+      const dx = awaiting ? 0 : Math.sin(t) * 2;
+      const dy = awaiting ? 0 : Math.cos(t + 0.4) * 2;
+
+      const cx = worm.x + GRID_SIZE / 2 + dx;
+      const cy = worm.y + GRID_SIZE / 2 + dy;
+
+      const wormsImg = tunaImagesRef.current['worms'];
+
+      if (wormsImg && wormsImg.complete) {
+        ctx.shadowColor = worm.color;
+        ctx.shadowBlur = 35;
+
+        const crabSize = GRID_SIZE * 1.5;
+        const offsetX = (GRID_SIZE - crabSize) / 2;
+        const offsetY = (GRID_SIZE - crabSize) / 2;
+
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = crabSize;
+        tempCanvas.height = crabSize;
+
+        tempCtx.drawImage(wormsImg, 0, 0, crabSize, crabSize);
+
+        try {
+          const imageData = tempCtx.getImageData(0, 0, crabSize, crabSize);
+          const data = imageData.data;
+          const colorMatch = worm.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+          if (colorMatch) {
+            const [, h, s, l] = colorMatch.map(Number);
+            const hslToRgb = (h, s, l) => {
+              h /= 360; s /= 100; l /= 100;
+              const a = s * Math.min(l, 1 - l);
+              const f = n => {
+                const k = (n + h * 12) % 12;
+                return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+              };
+              return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+            };
+            const [r, g, b] = hslToRgb(h, s, l);
+            for (let i = 0; i < data.length; i += 4) {
+              if (data[i + 3] > 0) {
+                const alpha = 0.7;
+                data[i] = data[i] * (1 - alpha) + r * alpha;
+                data[i + 1] = data[i + 1] * (1 - alpha) + g * alpha;
+                data[i + 2] = data[i + 2] * (1 - alpha) + b * alpha;
+              }
+            }
+            tempCtx.putImageData(imageData, 0, 0);
+          }
+        } catch (e) {
+          // ignore CORS errors
+        }
+
+        ctx.drawImage(tempCanvas, worm.x + dx + offsetX, worm.y + dy + offsetY);
+      } else {
+        ctx.shadowColor = worm.color;
+        ctx.shadowBlur = 28;
+        ctx.beginPath();
+        ctx.arc(cx, cy, GRID_SIZE / 1.85, 0, 2 * Math.PI);
+        ctx.fillStyle = worm.color;
+        ctx.fill();
+      }
+
+      ctx.shadowColor = "#fff";
+      ctx.shadowBlur = 25;
+      ctx.globalAlpha = 0.95;
+      ctx.font = `bold ${Math.floor(GRID_SIZE * 0.45)}px Segoe UI, Arial`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#ffffff";
+      ctx.strokeText(worm.label, cx, cy + 1);
+      ctx.fillStyle = "#111";
+      ctx.fillText(worm.label, cx, cy + 1);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    });
+  }, []);
+
   // Water splash explosion animation loop - Maori ocean theme
   const explosionLoop = useCallback(() => {
     const canvas = canvasRef.current;
@@ -305,6 +422,9 @@ function App() {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, offsetX, offsetY);
     ctx.clearRect(-offsetX, -offsetY, canvas.width, canvas.height);
+
+    // Draw background and worms first (with shake offset)
+    drawBackgroundAndWorms(ctx);
 
     let done = true;
 
@@ -443,7 +563,7 @@ function App() {
     if (!done && isExplodingRef.current) {
       requestAnimationFrame(explosionLoop);
     }
-  }, []);
+  }, [drawBackgroundAndWorms]);
 
   // Helper: pick tuna image based on adjacent segments and current direction
   const getTunaImage = useCallback((segment, idx, snakeArr) => {
