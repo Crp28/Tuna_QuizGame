@@ -61,7 +61,7 @@ mysql -u root -p < SNAKE.sql
 
 Verify the database exists:
 ```bash
-mysql -u ecms_nz -p
+mysql -u root -p
 mysql> SHOW DATABASES;
 mysql> USE SNAKE;
 mysql> SHOW TABLES;
@@ -88,7 +88,7 @@ cp .env.example .env
 Edit `.env` if your database credentials are different:
 ```env
 DB_HOST=localhost
-DB_USER=ecms_nz
+DB_USER=root
 DB_PASSWORD=6HhBrKSXFA3tqjg
 DB_NAME=SNAKE
 PORT=5000

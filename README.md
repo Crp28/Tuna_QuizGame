@@ -36,6 +36,8 @@ Snake Quiz Game is an innovative educational tool that combines the classic Snak
 - 🔐 **NEW**: User authentication (student/admin accounts)
 - 📊 **NEW**: Question bank management (admin feature)
 - 🎯 **NEW**: Selectable question banks per user
+- 📤 **NEW**: Bulk question upload via JSON (admin feature)
+- 🎮 **NEW**: Practice mode for struggling players
 
 ## Getting Started
 
@@ -70,6 +72,11 @@ npm start
 - Start playing!
 
 For detailed instructions, see [RUNNING_THE_APP.md](RUNNING_THE_APP.md) and [USER_ACCOUNTS.md](USER_ACCOUNTS.md).
+
+### New Features Documentation
+
+- **[BULK_UPLOAD_GUIDE.md](BULK_UPLOAD_GUIDE.md)** - How to use the bulk question upload feature
+- **[PRACTICE_MODE_GUIDE.md](PRACTICE_MODE_GUIDE.md)** - How the practice mode detection works
 
 ### Option 1: Original Version (Vanilla JS)
 

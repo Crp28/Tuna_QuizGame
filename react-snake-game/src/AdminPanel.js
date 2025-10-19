@@ -30,10 +30,15 @@ function AdminPanel({ onClose, translations }) {
     answer: 'A'
   });
 
+  // Bulk upload form
+  const [bulkUploadBank, setBulkUploadBank] = useState('');
+  const [bulkJsonText, setBulkJsonText] = useState('');
+
   const t = translations || {
     adminPanelTitle: 'Admin Panel',
     createBankTab: 'Create Bank',
     addQuestionsTab: 'Add Questions',
+    bulkUploadTab: 'Bulk Upload',
     close: 'Close',
     folder: 'Folder ID',
     name: 'Bank Name',
@@ -47,6 +52,13 @@ function AdminPanel({ onClose, translations }) {
     optionD: 'Option D',
     correctAnswer: 'Correct Answer',
     addQuestionButton: 'Add Question',
+    bulkUploadButton: 'Upload Questions',
+    bulkJsonLabel: 'Paste JSON or Upload File',
+    bulkJsonPlaceholder: 'Paste JSON array of questions here...',
+    bulkFileUpload: 'Or choose a JSON file',
+    bulkUploadSuccess: 'Successfully uploaded',
+    bulkUploadFailed: 'Failed to upload',
+    bulkUploadInvalidJson: 'Invalid JSON format',
     loading: 'Loading...',
     bankName: 'Bank Name',
     questionPlaceholder: 'Enter your question here...',
@@ -167,6 +179,100 @@ function AdminPanel({ onClose, translations }) {
     }
   };
 
+  const handleBulkUpload = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!bulkUploadBank) {
+      setError('Please select a question bank');
+      return;
+    }
+
+    if (!bulkJsonText.trim()) {
+      setError('Please paste JSON or upload a file');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Parse and validate JSON
+      let questions;
+      try {
+        questions = JSON.parse(bulkJsonText);
+      } catch (parseError) {
+        throw new Error(t.bulkUploadInvalidJson + ': ' + parseError.message);
+      }
+
+      // Validate it's an array
+      if (!Array.isArray(questions)) {
+        throw new Error('JSON must be an array of questions');
+      }
+
+      if (questions.length === 0) {
+        throw new Error('No questions found in JSON');
+      }
+
+      // Validate each question structure
+      const invalidQuestions = [];
+      questions.forEach((q, index) => {
+        if (!q.question || !q.options || !q.answer) {
+          invalidQuestions.push(`Question ${index + 1}: missing required fields (question, options, answer)`);
+        } else if (!Array.isArray(q.options) || q.options.length !== 4) {
+          invalidQuestions.push(`Question ${index + 1}: must have exactly 4 options`);
+        } else if (!['A', 'B', 'C', 'D'].includes(q.answer)) {
+          invalidQuestions.push(`Question ${index + 1}: answer must be A, B, C, or D`);
+        }
+      });
+
+      if (invalidQuestions.length > 0) {
+        throw new Error('Validation errors:\n' + invalidQuestions.join('\n'));
+      }
+
+      // Upload questions
+      const response = await fetch(`/api/question-banks/${bulkUploadBank}/questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ questions })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload questions');
+      }
+
+      setSuccess(`${t.bulkUploadSuccess} ${data.addedCount} question(s)! Total in bank: ${data.totalCount}`);
+      setBulkJsonText('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      setError('Please upload a JSON file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setBulkJsonText(event.target.result);
+      setError('');
+    };
+    reader.onerror = () => {
+      setError('Failed to read file');
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="admin-panel-overlay" onClick={onClose}>
       <div className="admin-panel-modal" onClick={(e) => e.stopPropagation()}>
@@ -195,6 +301,16 @@ function AdminPanel({ onClose, translations }) {
             }}
           >
             {t.addQuestionsTab}
+          </button>
+          <button
+            className={`tab ${activeTab === 'bulk' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('bulk');
+              setError('');
+              setSuccess('');
+            }}
+          >
+            {t.bulkUploadTab}
           </button>
         </div>
 
@@ -248,7 +364,7 @@ function AdminPanel({ onClose, translations }) {
                 {isLoading ? t.loading : t.createButton}
               </button>
             </form>
-          ) : (
+          ) : activeTab === 'add' ? (
             <form className="admin-form" onSubmit={handleAddQuestions}>
               <div className="form-group">
                 <label htmlFor="bank-select">{t.selectBank}</label>
@@ -351,6 +467,66 @@ function AdminPanel({ onClose, translations }) {
 
               <button type="submit" className="submit-button" disabled={isLoading}>
                 {isLoading ? t.loading : t.addQuestionButton}
+              </button>
+            </form>
+          ) : (
+            <form className="admin-form" onSubmit={handleBulkUpload}>
+              <div className="form-group">
+                <label htmlFor="bulk-bank-select">{t.selectBank}</label>
+                <select
+                  id="bulk-bank-select"
+                  value={bulkUploadBank}
+                  onChange={(e) => setBulkUploadBank(e.target.value)}
+                  disabled={isLoading}
+                  required
+                >
+                  <option value="">{t.selectBank}</option>
+                  {banks.map((bank) => (
+                    <option key={bank.id} value={bank.folder}>
+                      {bank.name} ({bank.folder})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="bulk-json">{t.bulkJsonLabel}</label>
+                <textarea
+                  id="bulk-json"
+                  rows="12"
+                  value={bulkJsonText}
+                  onChange={(e) => setBulkJsonText(e.target.value)}
+                  placeholder={t.bulkJsonPlaceholder}
+                  disabled={isLoading}
+                  required
+                  style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                />
+                <div className="helper-text">
+                  Expected format: [{'{'}"question": "...", "options": ["A", "B", "C", "D"], "answer": "A"{'}'},...]
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="bulk-file">{t.bulkFileUpload}</label>
+                <input
+                  id="bulk-file"
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileUpload}
+                  disabled={isLoading}
+                  style={{
+                    padding: '8px',
+                    background: '#16213e',
+                    border: '2px solid #2a3f5f',
+                    borderRadius: '8px',
+                    color: '#ffffff',
+                    cursor: 'pointer'
+                  }}
+                />
+              </div>
+
+              <button type="submit" className="submit-button" disabled={isLoading}>
+                {isLoading ? t.loading : t.bulkUploadButton}
               </button>
             </form>
           )}

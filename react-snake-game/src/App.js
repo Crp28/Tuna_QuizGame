@@ -5,6 +5,7 @@ import LanguageSwitcher from './LanguageSwitcher';
 import LoginPage from './LoginPage';
 import UserPanel from './UserPanel';
 import QuestionBankSelector from './QuestionBankSelector';
+import PracticeModePopup from './PracticeModePopup';
 
 const GRID_SIZE = 24;
 const CANVAS_WIDTH = 900;
@@ -90,7 +91,7 @@ const generateWormsForQuestion = (question, snake) => {
     x: positions[i].x,
     y: positions[i].y,
     label,
-    isCorrect: label === question.answer,
+    isCorrect: question && question.answer ? label === question.answer : false,
     color: getColor()
   }));
 };
@@ -107,23 +108,19 @@ function App() {
   // Question bank state
   const [currentBank, setCurrentBank] = useState('comp705-01');
 
-  // Game state
+  // Game UI state (low-frequency)
   const [questions, setQuestions] = useState([
     {
       question: "Questions will show after game start.",
       options: ["", "", "", ""],
+      answer: "A"
     },
   ]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [questionsLoaded, setQuestionsLoaded] = useState(true);
   const [leaderboardLoaded, setLeaderboardLoaded] = useState(true);
-  const [snake, setSnake] = useState([
-    { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
-    { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
-    { x: GRID_SIZE * 2, y: GRID_SIZE * 8 }
-  ]);
-  const [direction, setDirection] = useState({ x: 0, y: 0 });
-  const [nextDir, setNextDir] = useState({ x: 0, y: 0 });
+
+  // UI snapshot state (not used for movement/drawing timing)
   const [worms, setWorms] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [isGameRunning, setIsGameRunning] = useState(false);
@@ -138,13 +135,40 @@ function App() {
   const [showNextLevel, setShowNextLevel] = useState(false);
   const [questionAnimationClass, setQuestionAnimationClass] = useState('fade-in');
 
+  // Practice mode state
+  const [isPracticeMode, setIsPracticeMode] = useState(false);
+  const [showPracticeModePopup, setShowPracticeModePopup] = useState(false);
+  const [practiceModeDisabled, setPracticeModeDisabled] = useState(false);
+  const [performanceHistory, setPerformanceHistory] = useState([]);
+  const [currentGameStart, setCurrentGameStart] = useState(null);
+  const [lastMoveTime, setLastMoveTime] = useState(null);
+
+  // Canvas & images
   const canvasRef = useRef(null);
   const gameLoopRef = useRef(null);
+  const tunaImagesRef = useRef({});
+  const bgImageRef = useRef(null);
+
+  // Timing/animation refs
   const lastStepTimeRef = useRef(0);
   const slowGlowPhaseRef = useRef(0);
   const slowGlowAlphaRef = useRef(0);
-  const tunaImagesRef = useRef({});
-  const bgImageRef = useRef(null);
+
+  // Authoritative high-frequency game state (refs)
+  const snakeRef = useRef([
+    { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
+    { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
+    { x: GRID_SIZE * 2, y: GRID_SIZE * 8 }
+  ]);
+  const wormsRef = useRef([]);
+  const directionRef = useRef({ x: 0, y: 0 }); // current movement applied on tick
+  const nextDirRef = useRef({ x: 0, y: 0 });   // next movement from input (applied next tick)
+  const pendingDirRef = useRef(null);          // one extra buffered turn for the following tick
+  const awaitingInitialMoveRef = useRef(true);
+  const startTimeRef = useRef(null);
+  const isSlowRef = useRef(false);
+  const levelRef = useRef(1);
+  const usedQuestionsRef = useRef([]);
 
   // Preload tuna images and background
   useEffect(() => {
@@ -198,7 +222,6 @@ function App() {
 
     const loadQuestions = async () => {
       try {
-        // Call Node.js backend API with selected bank
         const response = await fetch(`/api/questions?folder=${currentBank}`, {
           credentials: 'include'
         });
@@ -209,15 +232,13 @@ function App() {
         setQuestionsLoaded(true);
       } catch (error) {
         console.error('Failed to load questions:', error);
-        window.alert('Failed to load questions.')
-        // Keep default questions - don't overwrite
+        window.alert('Failed to load questions.');
         setQuestionsLoaded(true);
       }
     };
 
     const loadLeaderboard = async () => {
       try {
-        // Call Node.js backend API with selected bank
         const response = await fetch(`/api/leaderboard?folder=${currentBank}`, {
           credentials: 'include'
         });
@@ -226,7 +247,6 @@ function App() {
         setLeaderboardLoaded(true);
       } catch (error) {
         console.error('Failed to load leaderboard:', error);
-        // Use empty array for testing
         setLeaderboard([]);
         setLeaderboardLoaded(true);
       }
@@ -239,24 +259,25 @@ function App() {
   // Initialize first question
   useEffect(() => {
     if (questions.length > 0 && !currentQuestion) {
-      const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestions);
+      const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
       setCurrentQuestion(question);
+      usedQuestionsRef.current = newUsed;
       setUsedQuestions(newUsed);
-      const newWorms = generateWormsForQuestion(question, snake);
+
+      const newWorms = generateWormsForQuestion(question, snakeRef.current);
+      wormsRef.current = newWorms;
       setWorms(newWorms);
 
-      // Set animation class when question changes
       const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
       setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
     }
-  }, [questions, currentQuestion, usedQuestions, snake]);
+  }, [questions, currentQuestion]);
 
-  // Helper function to get the appropriate tuna image for a snake segment
-  const getTunaImage = useCallback((segment, idx, snake) => {
-    const prev = idx > 0 ? snake[idx - 1] : null;
-    const next = idx < snake.length - 1 ? snake[idx + 1] : null;
+  // Helper: pick tuna image based on adjacent segments and current direction
+  const getTunaImage = useCallback((segment, idx, snakeArr) => {
+    const prev = idx > 0 ? snakeArr[idx - 1] : null;
+    const next = idx < snakeArr.length - 1 ? snakeArr[idx + 1] : null;
 
-    // Calculate direction vectors
     const dirFromPrev = prev ? {
       x: segment.x - prev.x,
       y: segment.y - prev.y
@@ -267,27 +288,25 @@ function App() {
       y: next.y - segment.y
     } : null;
 
-    // Head (first segment) - faces the direction of movement
+    // Head
     if (idx === 0) {
-      // The head faces opposite to where the next segment is
       if (dirToNext) {
         if (dirToNext.x > 0) return 'head_left';
         if (dirToNext.x < 0) return 'head_right';
         if (dirToNext.y > 0) return 'head_up';
         if (dirToNext.y < 0) return 'head_down';
       }
-      // Fallback based on current direction of movement
-      if (direction.x > 0) return 'head_right';
-      if (direction.x < 0) return 'head_left';
-      if (direction.y > 0) return 'head_down';
-      if (direction.y < 0) return 'head_up';
+      const d = directionRef.current || { x: 0, y: 0 };
+      if (d.x > 0) return 'head_right';
+      if (d.x < 0) return 'head_left';
+      if (d.y > 0) return 'head_down';
+      if (d.y < 0) return 'head_up';
       return 'head_right';
     }
 
-    // Tail (last segment) - points in the direction it came from
-    if (idx === snake.length - 1) {
+    // Tail
+    if (idx === snakeArr.length - 1) {
       if (dirFromPrev) {
-        // Tail points opposite to where it came from
         if (dirFromPrev.x > 0) return 'tail_horizontal_left';
         if (dirFromPrev.x < 0) return 'tail_horizontal_right';
         if (dirFromPrev.y > 0) return 'tail_vertical_up';
@@ -296,47 +315,31 @@ function App() {
       return 'tail_horizontal_right';
     }
 
-    // Body segments - check if turning or straight
+    // Body
     if (dirFromPrev && dirToNext) {
-      // Check if this is a turning segment
       const isTurning = dirFromPrev.x !== dirToNext.x && dirFromPrev.y !== dirToNext.y;
-
       if (isTurning) {
-        // For turning pieces, we need to check the actual direction flow
-        // dirFromPrev tells us where we came from, dirToNext tells us where we're going
-
-        // Coming from left, turning up
         if (dirFromPrev.x > 0 && dirToNext.y < 0) return 'turning_body_up_left';
-        // Coming from left, turning down  
         if (dirFromPrev.x > 0 && dirToNext.y > 0) return 'turning_body_down_left';
-        // Coming from right, turning up
         if (dirFromPrev.x < 0 && dirToNext.y < 0) return 'turning_body_up_right';
-        // Coming from right, turning down
         if (dirFromPrev.x < 0 && dirToNext.y > 0) return 'turning_body_down_right';
-        // Coming from up, turning left
         if (dirFromPrev.y > 0 && dirToNext.x < 0) return 'turning_body_up_left';
-        // Coming from up, turning right
         if (dirFromPrev.y > 0 && dirToNext.x > 0) return 'turning_body_up_right';
-        // Coming from down, turning left
         if (dirFromPrev.y < 0 && dirToNext.x < 0) return 'turning_body_down_left';
-        // Coming from down, turning right
         if (dirFromPrev.y < 0 && dirToNext.x > 0) return 'turning_body_down_right';
       } else {
-        // Straight body segment - faces the direction the body is oriented
         if (dirFromPrev.x !== 0) {
-          // Horizontal - body faces the direction opposite to where it came from
           return dirFromPrev.x > 0 ? 'straight_body_horizontal_left' : 'straight_body_horizontal_right';
         } else {
-          // Vertical - body faces the direction opposite to where it came from
           return dirFromPrev.y > 0 ? 'straight_body_vertical_up' : 'straight_body_vertical_down';
         }
       }
     }
 
     return 'straight_body_horizontal_right';
-  }, [direction]);
+  }, []);
 
-  // Draw game
+  // Draw to canvas (read refs directly)
   const drawGame = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -344,17 +347,16 @@ function App() {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw background image if loaded
+    // Background
     if (bgImageRef.current && bgImageRef.current.complete) {
       ctx.drawImage(bgImageRef.current, 0, 0, canvas.width, canvas.height);
     }
 
-    // Draw very light grid lines
+    // Very light grid
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'; // Very light, barely visible
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 0.5;
 
-    // Draw vertical lines
     for (let x = 0; x <= canvas.width; x += GRID_SIZE) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
@@ -362,7 +364,6 @@ function App() {
       ctx.stroke();
     }
 
-    // Draw horizontal lines
     for (let y = 0; y <= canvas.height; y += GRID_SIZE) {
       ctx.beginPath();
       ctx.moveTo(0, y);
@@ -371,143 +372,113 @@ function App() {
     }
     ctx.restore();
 
-    // Draw worms
-    worms.forEach((worm, i) => {
+    const wormsToDraw = wormsRef.current || [];
+    const snakeToDraw = snakeRef.current || [];
+    const awaiting = awaitingInitialMoveRef.current;
+
+    // Worms
+    wormsToDraw.forEach((worm, i) => {
       ctx.save();
 
       const t = Date.now() / 600 + i;
-      const dx = awaitingInitialMove ? 0 : Math.sin(t) * 2;
-      const dy = awaitingInitialMove ? 0 : Math.cos(t + 0.4) * 2;
+      const dx = awaiting ? 0 : Math.sin(t) * 2;
+      const dy = awaiting ? 0 : Math.cos(t + 0.4) * 2;
 
       const cx = worm.x + GRID_SIZE / 2 + dx;
       const cy = worm.y + GRID_SIZE / 2 + dy;
 
-      // Get the worms image
       const wormsImg = tunaImagesRef.current['worms'];
 
       if (wormsImg && wormsImg.complete) {
-        // Apply glow effect using the worm's color
         ctx.shadowColor = worm.color;
-        ctx.shadowBlur = 35; // Increased glow
+        ctx.shadowBlur = 35;
 
-        // Make the crab larger
-        const crabSize = GRID_SIZE * 1.5; // 50% larger than grid size
-        const offsetX = (GRID_SIZE - crabSize) / 2; // positioning offset
+        const crabSize = GRID_SIZE * 1.5;
+        const offsetX = (GRID_SIZE - crabSize) / 2;
         const offsetY = (GRID_SIZE - crabSize) / 2;
 
-        // Create a colored version of the worms image
         const tempCanvas = document.createElement('canvas');
         const tempCtx = tempCanvas.getContext('2d');
         tempCanvas.width = crabSize;
         tempCanvas.height = crabSize;
 
-        // Draw the original image at larger size
         tempCtx.drawImage(wormsImg, 0, 0, crabSize, crabSize);
 
-        // Get image data and apply color tint
-        const imageData = tempCtx.getImageData(0, 0, crabSize, crabSize);
-        const data = imageData.data;
-
-        // Parse the worm color (HSL format)
-        const colorMatch = worm.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-        if (colorMatch) {
-          const [, h, s, l] = colorMatch.map(Number);
-
-          // Convert HSL to RGB
-          const hslToRgb = (h, s, l) => {
-            h /= 360;
-            s /= 100;
-            l /= 100;
-            const a = s * Math.min(l, 1 - l);
-            const f = n => {
-              const k = (n + h * 12) % 12;
-              return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        try {
+          const imageData = tempCtx.getImageData(0, 0, crabSize, crabSize);
+          const data = imageData.data;
+          const colorMatch = worm.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+          if (colorMatch) {
+            const [, h, s, l] = colorMatch.map(Number);
+            const hslToRgb = (h, s, l) => {
+              h /= 360; s /= 100; l /= 100;
+              const a = s * Math.min(l, 1 - l);
+              const f = n => {
+                const k = (n + h * 12) % 12;
+                return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+              };
+              return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
             };
-            return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
-          };
-
-          const [r, g, b] = hslToRgb(h, s, l);
-
-          // Apply color tint to non-transparent pixels
-          for (let i = 0; i < data.length; i += 4) {
-            if (data[i + 3] > 0) { // If pixel is not transparent
-              // Blend the original color with the worm color
-              const alpha = 0.7; // Adjust this to control color intensity
-              data[i] = data[i] * (1 - alpha) + r * alpha;     // Red
-              data[i + 1] = data[i + 1] * (1 - alpha) + g * alpha; // Green
-              data[i + 2] = data[i + 2] * (1 - alpha) + b * alpha; // Blue
+            const [r, g, b] = hslToRgb(h, s, l);
+            for (let i = 0; i < data.length; i += 4) {
+              if (data[i + 3] > 0) {
+                const alpha = 0.7;
+                data[i] = data[i] * (1 - alpha) + r * alpha;
+                data[i + 1] = data[i + 1] * (1 - alpha) + g * alpha;
+                data[i + 2] = data[i + 2] * (1 - alpha) + b * alpha;
+              }
             }
+            tempCtx.putImageData(imageData, 0, 0);
           }
-
-          tempCtx.putImageData(imageData, 0, 0);
+        } catch (e) {
+          // ignore CORS errors (fallback handled below)
         }
 
-        // Draw the colored image at larger size
         ctx.drawImage(tempCanvas, worm.x + dx + offsetX, worm.y + dy + offsetY);
       } else {
-        // Fallback to original circle drawing if image not loaded
         ctx.shadowColor = worm.color;
         ctx.shadowBlur = 28;
-
         ctx.beginPath();
         ctx.arc(cx, cy, GRID_SIZE / 1.85, 0, 2 * Math.PI);
         ctx.fillStyle = worm.color;
         ctx.fill();
       }
 
-      // Draw the label on top (same for both image and fallback)
       ctx.shadowColor = "#fff";
       ctx.shadowBlur = 25;
       ctx.globalAlpha = 0.95;
       ctx.font = `bold ${Math.floor(GRID_SIZE * 0.45)}px Segoe UI, Arial`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-
-      ctx.lineWidth = 4; // Thicker outline
+      ctx.lineWidth = 4;
       ctx.strokeStyle = "#ffffff";
       ctx.strokeText(worm.label, cx, cy + 1);
-
       ctx.fillStyle = "#111";
       ctx.fillText(worm.label, cx, cy + 1);
-
       ctx.globalAlpha = 1;
       ctx.restore();
     });
 
-    // Draw snake
-    snake.forEach((segment, idx) => {
+    // Snake
+    snakeToDraw.forEach((segment, idx) => {
       ctx.save();
 
-      // Get the appropriate tuna image
-      const imageName = getTunaImage(segment, idx, snake);
+      const imageName = getTunaImage(segment, idx, snakeToDraw);
       const img = tunaImagesRef.current[imageName];
 
-      if (img && img.complete) {
-        // Apply glow effect if in slow mode
-        if (slowGlowAlphaRef.current > 0.03) {
-          const hue = (slowGlowPhaseRef.current * 36 + idx * 23) % 360;
-          const pulse = 0.8 + 0.25 * Math.sin(slowGlowPhaseRef.current + idx * 0.6);
-          ctx.shadowColor = `hsl(${hue}, 98%, 75%)`;
-          ctx.shadowBlur = 40 * pulse * slowGlowAlphaRef.current;
-        } else {
-          ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
-          ctx.shadowBlur = idx === 0 ? 6 : 3;
-        }
+      if (slowGlowAlphaRef.current > 0.03) {
+        const hue = (slowGlowPhaseRef.current * 36 + idx * 23) % 360;
+        const pulse = 0.8 + 0.25 * Math.sin(slowGlowPhaseRef.current + idx * 0.6);
+        ctx.shadowColor = `hsl(${hue}, 98%, 75%)`;
+        ctx.shadowBlur = 40 * pulse * slowGlowAlphaRef.current;
+      } else {
+        ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
+        ctx.shadowBlur = idx === 0 ? 6 : 3;
+      }
 
-        // Draw the tuna image
+      if (img && img.complete) {
         ctx.drawImage(img, segment.x, segment.y, GRID_SIZE, GRID_SIZE);
       } else {
-        // Fallback to original drawing if image not loaded
-        if (slowGlowAlphaRef.current > 0.03) {
-          const hue = (slowGlowPhaseRef.current * 36 + idx * 23) % 360;
-          const pulse = 0.8 + 0.25 * Math.sin(slowGlowPhaseRef.current + idx * 0.6);
-          ctx.shadowColor = `hsl(${hue}, 98%, 75%)`;
-          ctx.shadowBlur = 40 * pulse * slowGlowAlphaRef.current;
-        } else {
-          ctx.shadowColor = idx === 0 ? "#ffe082" : "#26ffd5";
-          ctx.shadowBlur = idx === 0 ? 6 : 3;
-        }
-
         const hue1 = (180 + idx * 8) % 360;
         const hue2 = (hue1 + 40) % 360;
         const grad = ctx.createLinearGradient(
@@ -533,115 +504,175 @@ function App() {
       }
       ctx.restore();
     });
-  }, [snake, worms, awaitingInitialMove, getTunaImage]);
+  }, [getTunaImage]);
 
   // Update game time
   useEffect(() => {
-    if (isGameRunning && startTime) {
+    if (isGameRunning && startTimeRef.current) {
       const interval = setInterval(() => {
-        setGameTime((Date.now() - startTime) / 1000);
+        setGameTime((Date.now() - startTimeRef.current) / 1000);
       }, 100);
       return () => clearInterval(interval);
     }
-  }, [isGameRunning, startTime]);
+  }, [isGameRunning]);
 
-  // End game callback
+  // End game callback (reads refs)
   const endGame = useCallback(() => {
     setIsGameRunning(false);
     setIsGameOver(true);
 
-    const finalEntry = {
-      name: user.username,
-      level: level,
-      time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
-      folder: currentBank
-    };
+    // Practice mode detection (unchanged logic, adapted to refs where needed)
+    if (!isPracticeMode && currentGameStart) {
+      const gameEndTime = Date.now();
+      const gameDuration = (gameEndTime - currentGameStart) / 1000;
+      const snakeLength = snakeRef.current.length;
+      const timeSinceLastMove = lastMoveTime ? (gameEndTime - lastMoveTime) / 1000 : 0;
 
-    setLeaderboard(prev => {
-      const updated = [...prev, finalEntry];
-      updated.sort((a, b) => b.level - a.level || a.time - b.time);
+      const performance = {
+        duration: gameDuration,
+        level: levelRef.current,
+        snakeLength: snakeLength,
+        timeSinceLastMove: timeSinceLastMove,
+        timestamp: gameEndTime
+      };
 
-      // Save to Node.js backend
-      fetch('/api/leaderboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(finalEntry)
-      }).catch(err => console.error('Failed to save score:', err));
+      setPerformanceHistory(prev => {
+        const updated = [...prev, performance];
+        if (updated.length > 5) updated.shift();
+        return updated;
+      });
 
-      return updated;
-    });
+      if (performanceHistory.length >= 2 && !practiceModeDisabled) {
+        const recentGames = [...performanceHistory, performance].slice(-3);
+        const isStruggling = detectStrugglingPlayer(recentGames);
+        if (isStruggling) setShowPracticeModePopup(true);
+      }
+    }
+
+    // Save score (non practice)
+    if (!isPracticeMode && user) {
+      const finalEntry = {
+        name: user.username,
+        level: levelRef.current,
+        time: startTimeRef.current ? ((Date.now() - startTimeRef.current) / 1000).toFixed(2) : 0,
+        folder: currentBank
+      };
+
+      setLeaderboard(prev => {
+        const updated = [...prev, finalEntry];
+        updated.sort((a, b) => b.level - a.level || a.time - b.time);
+        fetch('/api/leaderboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(finalEntry)
+        }).catch(err => console.error('Failed to save score:', err));
+        return updated;
+      });
+    }
 
     setShowSplash(true);
-  }, [user, level, startTime, currentBank]);
+  }, [user, currentGameStart, lastMoveTime, performanceHistory, practiceModeDisabled, isPracticeMode, currentBank]);
 
-  // Game loop
+  const detectStrugglingPlayer = (recentGames) => {
+    let strugglingCount = 0;
+    for (const game of recentGames) {
+      let indicators = 0;
+      if (game.duration < 10) indicators++;
+      if (game.snakeLength < 5 && game.duration > 3) indicators++;
+      if (game.timeSinceLastMove > 3) indicators++;
+      if (indicators >= 2) strugglingCount++;
+    }
+    return strugglingCount >= 2;
+  };
+
+  // Main game loop with tempo-safe two-stage input buffer
   useEffect(() => {
     if (!isGameRunning) return;
 
-    const moveSnake = () => {
-      if (nextDir.x === 0 && nextDir.y === 0) return true;
+    const isOpposite = (a, b) => (a.x + b.x === 0 && a.y + b.y === 0);
+    const isSame = (a, b) => (a.x === b.x && a.y === b.y);
+
+    // One-tick move, returns false if died
+    const moveSnakeOnce = () => {
+      // Apply the next scheduled direction; keep moving in that direction
+      const d = nextDirRef.current;
+      directionRef.current = d;
+      if (d.x === 0 && d.y === 0) return true; // idle before first move
 
       const head = {
-        x: snake[0].x + nextDir.x,
-        y: snake[0].y + nextDir.y
+        x: snakeRef.current[0].x + d.x,
+        y: snakeRef.current[0].y + d.y
       };
+      const newSnake = [head, ...snakeRef.current];
 
-      const newSnake = [head, ...snake];
-
-      const eatenIdx = worms.findIndex(w => w.x === head.x && w.y === head.y);
+      const eatenIdx = (wormsRef.current || []).findIndex(w => w.x === head.x && w.y === head.y);
       if (eatenIdx !== -1) {
-        const worm = worms[eatenIdx];
+        const worm = wormsRef.current[eatenIdx];
         if (worm.isCorrect) {
-          setLevel(l => l + 1);
+          // Level up
+          levelRef.current = (levelRef.current || 1) + 1;
+          setLevel(levelRef.current);
 
-          // Update leaderboard
-          const newEntry = {
-            name: user.username,
-            level: level + 1,
-            time: startTime ? ((Date.now() - startTime) / 1000).toFixed(2) : 0,
-            folder: currentBank
-          };
+          // Leaderboard (non practice)
+          if (!isPracticeMode && user) {
+            const newEntry = {
+              name: user.username,
+              level: levelRef.current,
+              time: startTimeRef.current ? ((Date.now() - startTimeRef.current) / 1000).toFixed(2) : 0,
+              folder: currentBank
+            };
+            setLeaderboard(prev => {
+              const idx = prev.findIndex(e => e.name === user.username);
+              const updated = idx !== -1 ? Object.assign([...prev], { [idx]: newEntry }) : [...prev, newEntry];
+              updated.sort((a, b) => b.level - a.level || a.time - b.time);
+              fetch('/api/leaderboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newEntry)
+              }).catch(err => console.error('Failed to save score:', err));
+              return updated;
+            });
+          }
 
-          setLeaderboard(prev => {
-            const existingIndex = prev.findIndex(e => e.name === user.username);
-            let updated;
-            if (existingIndex !== -1) {
-              updated = [...prev];
-              updated[existingIndex] = newEntry;
-            } else {
-              updated = [...prev, newEntry];
-            }
-            updated.sort((a, b) => b.level - a.level || a.time - b.time);
+          // Next question + worms
+          const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
+          if (question) {
+            setCurrentQuestion(question);
+            usedQuestionsRef.current = newUsed;
+            setUsedQuestions(newUsed);
 
-            // Save to Node.js backend
-            fetch('/api/leaderboard', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(newEntry)
-            }).catch(err => console.error('Failed to save score:', err));
+            const newWorms = generateWormsForQuestion(question, newSnake);
+            wormsRef.current = newWorms;
+            setWorms(newWorms);
+          }
 
-            return updated;
-          });
+          // Commit snake
+          snakeRef.current = newSnake;
 
-          // Next question
-          const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestions);
-          setCurrentQuestion(question);
-          setUsedQuestions(newUsed);
-          const newWorms = generateWormsForQuestion(question, newSnake);
-          setWorms(newWorms);
-          setSnake(newSnake);
+          // Slow-motion effect
+          isSlowRef.current = true;
+          setIsSlow(true);
+          setTimeout(() => {
+            isSlowRef.current = false;
+            setIsSlow(false);
+          }, 2000);
 
-          // Set animation class when question changes
+          // Next level CTA
+          if (!isPracticeMode && usedQuestionsRef.current && usedQuestionsRef.current.length >= Math.ceil(questions.length / 2)) {
+            setShowNextLevel(true);
+          }
+
+          // Question animation
           const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
           setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
 
-          // Slow motion effect
-          setIsSlow(true);
-          setTimeout(() => setIsSlow(false), 2000);
-
-          // Check for next level
-          if (newUsed.length >= Math.ceil(questions.length / 2)) {
-            setShowNextLevel(true);
+          // After a successful move, promote pending turn (if valid vs new direction)
+          if (pendingDirRef.current) {
+            const pd = pendingDirRef.current;
+            if (!isOpposite(pd, directionRef.current) && !isSame(pd, directionRef.current)) {
+              nextDirRef.current = pd;
+            }
+            pendingDirRef.current = null;
           }
 
           return true;
@@ -650,32 +681,44 @@ function App() {
           return false;
         }
       } else {
+        // Move forward (pop tail)
         newSnake.pop();
-        setSnake(newSnake);
+        snakeRef.current = newSnake;
+
+        // After a successful move, promote pending turn (if valid vs new direction)
+        if (pendingDirRef.current) {
+          const pd = pendingDirRef.current;
+          if (!isOpposite(pd, directionRef.current) && !isSame(pd, directionRef.current)) {
+            nextDirRef.current = pd;
+          }
+          pendingDirRef.current = null;
+        }
+
+        return true;
       }
-      return true;
     };
 
     const checkCollision = () => {
-      const head = snake[0];
-      if (nextDir.x === 0 && nextDir.y === 0) return false;
-      if (head.x < 0 || head.x >= CANVAS_WIDTH || head.y < 0 || head.y >= CANVAS_HEIGHT)
-        return true;
-      for (let i = 1; i < snake.length; i++)
-        if (snake[i].x === head.x && snake[i].y === head.y)
-          return true;
+      const head = snakeRef.current[0];
+      const d = directionRef.current;
+      if (d.x === 0 && d.y === 0) return false;
+      if (head.x < 0 || head.x >= CANVAS_WIDTH || head.y < 0 || head.y >= CANVAS_HEIGHT) return true;
+      for (let i = 1; i < snakeRef.current.length; i++) {
+        if (snakeRef.current[i].x === head.x && snakeRef.current[i].y === head.y) return true;
+      }
       return false;
     };
 
-    // Game logic timer - runs even when tab is hidden
     const gameLogicLoop = () => {
       const now = Date.now();
       if (!lastStepTimeRef.current) lastStepTimeRef.current = now;
 
-      const stepDelay = isSlow ? 340 : Math.max(MIN_STEP_DELAY, START_STEP_DELAY - 2 * level);
+      const baseDelay = isSlowRef.current ? 340 : Math.max(MIN_STEP_DELAY, START_STEP_DELAY - 2 * (levelRef.current || 1));
+      const stepDelay = isPracticeMode ? baseDelay + 80 : baseDelay;
 
+      // Slow glow animation
       const fadeSpeed = 0.09;
-      if (isSlow) {
+      if (isSlowRef.current) {
         slowGlowPhaseRef.current += 0.09;
         slowGlowAlphaRef.current += fadeSpeed * (1 - slowGlowAlphaRef.current);
       } else {
@@ -683,42 +726,37 @@ function App() {
         slowGlowPhaseRef.current = 0;
       }
 
-      if (awaitingInitialMove && (nextDir.x === 0 && nextDir.y === 0)) {
+      // Awaiting initial move (keep drawing, no movement yet)
+      if (awaitingInitialMoveRef.current && (nextDirRef.current.x === 0 && nextDirRef.current.y === 0)) {
         return;
-      } else if (awaitingInitialMove) {
-        setDirection(nextDir);
-        setAwaitingInitialMove(false);
       }
 
       while (now - lastStepTimeRef.current >= stepDelay) {
-        if (!moveSnake()) return;
+        if (!moveSnakeOnce()) return;
         if (checkCollision()) {
           endGame();
           return;
         }
-        // Update direction after the snake moves
-        setDirection(nextDir);
         lastStepTimeRef.current += stepDelay;
       }
     };
 
-    // Drawing loop - uses requestAnimationFrame for smooth rendering
+    // Start loops
+    const logicIntervalId = setInterval(gameLogicLoop, 16); // ~60Hz logic
+    let rafId = null;
     const drawLoop = () => {
       drawGame();
-      gameLoopRef.current = requestAnimationFrame(drawLoop);
+      rafId = requestAnimationFrame(drawLoop);
+      gameLoopRef.current = rafId;
     };
-
-    // Start both loops
-    const logicIntervalId = setInterval(gameLogicLoop, 16); // ~60fps for logic
-    gameLoopRef.current = requestAnimationFrame(drawLoop);
+    rafId = requestAnimationFrame(drawLoop);
+    gameLoopRef.current = rafId;
 
     return () => {
       clearInterval(logicIntervalId);
-      if (gameLoopRef.current) {
-        cancelAnimationFrame(gameLoopRef.current);
-      }
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [isGameRunning, snake, nextDir, worms, awaitingInitialMove, isSlow, level, questions, usedQuestions, user, startTime, drawGame, endGame, currentBank]);
+  }, [isGameRunning, isPracticeMode, drawGame, endGame, questions]);
 
   const startGame = useCallback(() => {
     if (!questions || questions.length === 0) {
@@ -726,17 +764,28 @@ function App() {
       return;
     }
 
-    setSnake([
+    // Initialize refs
+    const initialSnake = [
       { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
       { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
       { x: GRID_SIZE * 2, y: GRID_SIZE * 8 }
-    ]);
-    setDirection({ x: 0, y: 0 });
-    setNextDir({ x: 0, y: 0 });
+    ];
+    snakeRef.current = initialSnake;
+    directionRef.current = { x: 0, y: 0 };
+    nextDirRef.current = { x: 0, y: 0 };
+    pendingDirRef.current = null;
+    awaitingInitialMoveRef.current = true;
+    isSlowRef.current = false;
+    levelRef.current = 1;
+    startTimeRef.current = null; // set on first input
+
+    // UI state
     setIsGameOver(false);
     setLevel(1);
     setUsedQuestions([]);
-    setStartTime(Date.now());
+    setStartTime(null);
+    setCurrentGameStart(Date.now());
+    setLastMoveTime(null);
     lastStepTimeRef.current = 0;
     setAwaitingInitialMove(true);
     setShowSplash(false);
@@ -749,24 +798,39 @@ function App() {
     }
 
     setCurrentQuestion(question);
+    usedQuestionsRef.current = newUsed;
     setUsedQuestions(newUsed);
-    const initialSnake = [
-      { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
-      { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
-      { x: GRID_SIZE * 2, y: GRID_SIZE * 8 }
-    ];
+
     const newWorms = generateWormsForQuestion(question, initialSnake);
+    wormsRef.current = newWorms;
     setWorms(newWorms);
 
-    // Set animation class when question changes
     const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
     setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
 
     setIsGameRunning(true);
   }, [questions]);
 
-  // Handle keyboard input
+  const handlePracticeModeAccept = (dontShowAgain) => {
+    setIsPracticeMode(true);
+    setShowPracticeModePopup(false);
+    if (dontShowAgain) setPracticeModeDisabled(true);
+  };
+
+  const handlePracticeModeDecline = (dontShowAgain) => {
+    setShowPracticeModePopup(false);
+    if (dontShowAgain) setPracticeModeDisabled(true);
+  };
+
+  const handleExitPracticeMode = () => {
+    setIsPracticeMode(false);
+  };
+
+  // Keyboard input: tempo-safe two-stage buffer
   useEffect(() => {
+    const isOpposite = (a, b) => (a.x + b.x === 0 && a.y + b.y === 0);
+    const isSame = (a, b) => (a.x === b.x && a.y === b.y);
+
     const handleKey = (e) => {
       if (!isGameRunning) {
         if (e.key.toLowerCase() === 's' && questionsLoaded && leaderboardLoaded) {
@@ -776,21 +840,66 @@ function App() {
       }
 
       const key = e.key.toLowerCase();
+      let newDir = null;
+      if (key === 'arrowup' || key === 'w') newDir = { x: 0, y: -GRID_SIZE };
+      else if (key === 'arrowdown' || key === 's') newDir = { x: 0, y: GRID_SIZE };
+      else if (key === 'arrowleft' || key === 'a') newDir = { x: -GRID_SIZE, y: 0 };
+      else if (key === 'arrowright' || key === 'd') newDir = { x: GRID_SIZE, y: 0 };
+      if (!newDir) return;
 
-      if ((key === 'arrowup' || key === 'w') && direction.y === 0) {
-        setNextDir({ x: 0, y: -GRID_SIZE });
-      } else if ((key === 'arrowdown' || key === 's') && direction.y === 0) {
-        setNextDir({ x: 0, y: GRID_SIZE });
-      } else if ((key === 'arrowleft' || key === 'a') && direction.x === 0) {
-        setNextDir({ x: -GRID_SIZE, y: 0 });
-      } else if ((key === 'arrowright' || key === 'd') && direction.x === 0) {
-        setNextDir({ x: GRID_SIZE, y: 0 });
+      // Determine current effective direction (or infer from body if idle)
+      const moving = (directionRef.current.x !== 0 || directionRef.current.y !== 0);
+      const eff = moving
+        ? directionRef.current
+        : (snakeRef.current.length > 1
+          ? {
+            x: snakeRef.current[0].x - snakeRef.current[1].x,
+            y: snakeRef.current[0].y - snakeRef.current[1].y
+          }
+          : { x: 0, y: 0 });
+
+      // First valid input: start rhythm from this press (snake.js)
+      if (awaitingInitialMoveRef.current) {
+        if (!isOpposite(newDir, eff)) {
+          nextDirRef.current = newDir;
+          awaitingInitialMoveRef.current = false;
+          setAwaitingInitialMove(false);
+          const now = Date.now();
+          startTimeRef.current = now;
+          setStartTime(now);
+          lastStepTimeRef.current = now;
+          directionRef.current = newDir; // visual orientation
+          setLastMoveTime(now);
+        }
+        return;
+      }
+
+      // After first move:
+      setLastMoveTime(Date.now());
+
+      const currentDir = directionRef.current;
+      const primaryQueued = !isSame(nextDirRef.current, currentDir); // a turn already scheduled?
+
+      if (!primaryQueued) {
+        // No primary turn queued: schedule for next tick if not reversing
+        if (!isOpposite(newDir, currentDir) && !isSame(newDir, currentDir)) {
+          nextDirRef.current = newDir;
+          // Clear any stale pending (shouldn't exist)
+          pendingDirRef.current = null;
+        }
+      } else {
+        // One primary turn already queued (nextDirRef): allow ONE extra pending turn validated vs that primary
+        const primary = nextDirRef.current;
+        if (!isOpposite(newDir, primary) && !isSame(newDir, primary)) {
+          // Last intent wins for the pending slot
+          pendingDirRef.current = newDir;
+        }
       }
     };
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [isGameRunning, direction, questionsLoaded, leaderboardLoaded, startGame]);
+  }, [isGameRunning, questionsLoaded, leaderboardLoaded, startGame]);
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
@@ -798,7 +907,6 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
-    // Reset game state
     setLevel(1);
     setIsGameRunning(false);
     setIsGameOver(false);
@@ -808,11 +916,11 @@ function App() {
   const handleBankChange = (bank) => {
     if (bank && bank.folder) {
       setCurrentBank(bank.folder);
-      // Reset game when changing banks
       setLevel(1);
       setIsGameRunning(false);
       setIsGameOver(false);
       setShowSplash(true);
+      usedQuestionsRef.current = [];
       setUsedQuestions([]);
     }
   };
@@ -1034,7 +1142,6 @@ function App() {
         {/* Right Panel */}
         <div className="right-panel">
           <div className="game-area">
-
             {/* Question Bank Selector */}
             <div style={{ marginBottom: '12px' }}>
               <QuestionBankSelector
@@ -1056,8 +1163,48 @@ function App() {
               </span>
             </div>
 
-            <div className="score">
-              {t.gameLevel} {level} | {t.gameTime} {gameTime.toFixed(1)} s
+            <div className="score" style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}>
+              <span>{t.gameLevel} {level} | {t.gameTime} {gameTime.toFixed(1)} s</span>
+              {isPracticeMode && (
+                <>
+                  <span style={{
+                    background: 'linear-gradient(135deg, #ff9800 0%, #f44336 100%)',
+                    color: '#ffffff',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                    boxShadow: '0 2px 6px rgba(255, 152, 0, 0.3)'
+                  }}>
+                    {t.practiceModeIndicator}
+                  </span>
+                  <button
+                    onClick={handleExitPracticeMode}
+                    style={{
+                      background: 'linear-gradient(135deg, #00c853 0%, #64dd17 100%)',
+                      color: '#ffffff',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold',
+                      border: 'none',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0, 200, 83, 0.3)',
+                      transition: 'transform 0.2s ease'
+                    }}
+                    onMouseOver={(e) => e.target.style.transform = 'translateY(-1px)'}
+                    onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+                  >
+                    {t.exitPracticeMode}
+                  </button>
+                </>
+              )}
             </div>
 
             <canvas
@@ -1093,6 +1240,15 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Practice Mode Popup */}
+      {showPracticeModePopup && (
+        <PracticeModePopup
+          onAccept={handlePracticeModeAccept}
+          onDecline={handlePracticeModeDecline}
+          translations={t}
+        />
+      )}
     </div>
   );
 }
