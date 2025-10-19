@@ -30,15 +30,12 @@ const getColor = (() => {
   };
 })();
 
-const randomColor = () => {
-  let h, s, l;
-  while (true) {
-    h = Math.floor(Math.random() * 360);
-    if (h >= 210 && h <= 270) continue;
-    s = 70 + Math.floor(Math.random() * 20);
-    l = 65 + Math.floor(Math.random() * 18);
-    break;
-  }
+// Water-themed color palette for Maori ocean theme
+const getWaterColor = () => {
+  const waterHues = [180, 190, 195, 200, 210]; // Cyan/turquoise/blue range
+  const h = waterHues[Math.floor(Math.random() * waterHues.length)];
+  const s = 70 + Math.floor(Math.random() * 25); // 70-95% saturation
+  const l = 55 + Math.floor(Math.random() * 25); // 55-80% lightness
   return `hsl(${h},${s}%,${l}%)`;
 };
 
@@ -291,17 +288,17 @@ function App() {
     }
   }, [questions, currentQuestion]);
 
-  // Explosion animation loop
+  // Water splash explosion animation loop - Maori ocean theme
   const explosionLoop = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    const MAX_TRAIL = 12;
-    const SHAKE_MAGNITUDE = 20;
+    const MAX_TRAIL = 15;
+    const SHAKE_MAGNITUDE = 12; // Gentler shake for water theme
     
     const elapsed = Date.now() - explosionStartRef.current;
-    const shake = Math.max(0, SHAKE_MAGNITUDE * (1 - (elapsed / 650)));
+    const shake = Math.max(0, SHAKE_MAGNITUDE * (1 - (elapsed / 500)));
     const offsetX = (Math.random() - 0.5) * shake;
     const offsetY = (Math.random() - 0.5) * shake;
 
@@ -313,58 +310,111 @@ function App() {
 
     if (explosionSegmentsRef.current.length > 0) {
       const head = explosionSegmentsRef.current[0];
+      const centerX = head.x + GRID_SIZE / 2;
+      const centerY = head.y + GRID_SIZE / 2;
 
-      // 🌟 Radial Starburst
-      for (let j = 0; j < 13; j++) {
-        const burstAngle = (Math.PI * 2 * j / 13) + (elapsed / 200) + Math.random() * 0.15;
-        const r = 60 + Math.sin(elapsed / 230 + j) * 8 + Math.random() * 12;
-        const x = head.x + GRID_SIZE / 2 + Math.cos(burstAngle) * r;
-        const y = head.y + GRID_SIZE / 2 + Math.sin(burstAngle) * r;
-        const radius = 16 + Math.sin(elapsed / 140 + j) * 4;
+      // 🌊 Water ripple waves expanding outward
+      const numRipples = 4;
+      for (let i = 0; i < numRipples; i++) {
+        const rippleDelay = i * 150;
+        const rippleElapsed = elapsed - rippleDelay;
+        if (rippleElapsed > 0) {
+          const rippleRadius = rippleElapsed * 0.4;
+          const rippleAlpha = Math.max(0, 0.6 - rippleElapsed / 800);
+          
+          ctx.save();
+          ctx.globalAlpha = rippleAlpha;
+          ctx.strokeStyle = `hsla(195, 85%, 70%, ${rippleAlpha})`;
+          ctx.lineWidth = 3 - (i * 0.5);
+          ctx.shadowColor = "#4dd0e1";
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, rippleRadius, 0, 2 * Math.PI);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // 💧 Water droplet spray particles
+      for (let j = 0; j < 20; j++) {
+        const angle = (Math.PI * 2 * j / 20) + (elapsed / 300);
+        const distance = 30 + elapsed * 0.15 + Math.sin(elapsed / 100 + j) * 8;
+        const x = centerX + Math.cos(angle) * distance;
+        const y = centerY + Math.sin(angle) * distance - (elapsed * 0.1); // Slight upward drift
+        const dropletSize = 5 + Math.sin(elapsed / 80 + j) * 3;
+        const alpha = Math.max(0, 0.7 - elapsed / 900);
 
         ctx.save();
-        ctx.globalAlpha = 0.35 + Math.sin(elapsed / 90 + j) * 0.5;
-        ctx.shadowColor = `hsla(${(elapsed / 2 + j * 40) % 360},100%,70%,1)`;
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = `hsla(${(elapsed / 3 + j * 30) % 360},95%,75%,0.7)`;
+        ctx.globalAlpha = alpha;
+        ctx.shadowColor = "#26c6da";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = `hsla(190, 80%, 75%, ${alpha})`;
         ctx.beginPath();
-        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.arc(x, y, dropletSize, 0, 2 * Math.PI);
         ctx.fill();
         ctx.restore();
       }
 
-      // 💥 Central flash glow
+      // 🫧 Rising bubbles
+      for (let b = 0; b < 12; b++) {
+        const bubbleX = centerX + (Math.random() - 0.5) * 80;
+        const bubbleY = centerY - (elapsed * 0.2) + b * 15;
+        const bubbleSize = 6 + Math.random() * 8;
+        const bubbleAlpha = Math.max(0, 0.5 - elapsed / 1000);
+        
+        if (bubbleAlpha > 0.05) {
+          ctx.save();
+          ctx.globalAlpha = bubbleAlpha * 0.6;
+          ctx.fillStyle = `hsla(180, 60%, 85%, ${bubbleAlpha * 0.4})`;
+          ctx.strokeStyle = `hsla(190, 80%, 90%, ${bubbleAlpha})`;
+          ctx.lineWidth = 2;
+          ctx.shadowColor = "#b2ebf2";
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(bubbleX, bubbleY, bubbleSize, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // 💎 Central splash impact
       ctx.save();
-      ctx.globalAlpha = 0.25 + 0.2 * Math.sin(elapsed / 60);
-      ctx.shadowColor = "#fff";
-      ctx.shadowBlur = 60;
-      ctx.fillStyle = "#fff3";
+      ctx.globalAlpha = Math.max(0, 0.4 - elapsed / 600);
+      ctx.shadowColor = "#80deea";
+      ctx.shadowBlur = 40;
+      ctx.fillStyle = `hsla(185, 90%, 80%, ${Math.max(0, 0.3 - elapsed / 600)})`;
       ctx.beginPath();
-      ctx.arc(head.x + GRID_SIZE / 2, head.y + GRID_SIZE / 2, 60 + elapsed * 0.08, 0, 2 * Math.PI);
+      ctx.arc(centerX, centerY, 45 + elapsed * 0.12, 0, 2 * Math.PI);
       ctx.fill();
       ctx.restore();
     }
 
-    // ✨ Particle segments and trails
+    // 🐟 Tuna segments dispersing with water trails
     explosionSegmentsRef.current.forEach(seg => {
       seg.x += seg.vx;
       seg.y += seg.vy;
-      seg.alpha -= 0.027;
+      seg.vy += 0.15; // Gravity effect
+      seg.vx *= 0.98; // Water resistance
+      seg.vy *= 0.98;
+      seg.alpha -= 0.022;
 
       if (seg.alpha > 0.02) done = false;
 
       seg.trail.push({ x: seg.x, y: seg.y, alpha: seg.alpha });
       if (seg.trail.length > MAX_TRAIL) seg.trail.shift();
 
-      // 🌀 Tapered fading trail
+      // 💧 Flowing water trails
       for (let i = 0; i < seg.trail.length - 1; i++) {
         const t0 = seg.trail[i];
         const t1 = seg.trail[i + 1];
 
         ctx.save();
-        ctx.globalAlpha = Math.max(0, t0.alpha * 0.2);
+        ctx.globalAlpha = Math.max(0, t0.alpha * 0.25);
         ctx.strokeStyle = seg.color;
-        ctx.lineWidth = 6 - 5 * (i / MAX_TRAIL);
+        ctx.lineWidth = 7 - 6 * (i / MAX_TRAIL);
+        ctx.shadowColor = seg.color;
+        ctx.shadowBlur = 8;
         ctx.beginPath();
         ctx.moveTo(t0.x + GRID_SIZE / 2, t0.y + GRID_SIZE / 2);
         ctx.lineTo(t1.x + GRID_SIZE / 2, t1.y + GRID_SIZE / 2);
@@ -372,14 +422,14 @@ function App() {
         ctx.restore();
       }
 
-      // 🧨 Segment core with glow
+      // 🐠 Segment with water shimmer
       ctx.save();
       ctx.globalAlpha = Math.max(0, seg.alpha);
-      ctx.shadowColor = seg.color;
-      ctx.shadowBlur = 30;
+      ctx.shadowColor = "#4dd0e1";
+      ctx.shadowBlur = 25;
       ctx.fillStyle = seg.color;
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = `hsla(190, 100%, 95%, ${seg.alpha * 0.8})`;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(seg.x, seg.y, GRID_SIZE, GRID_SIZE, 10);
       else ctx.rect(seg.x, seg.y, GRID_SIZE, GRID_SIZE);
@@ -650,13 +700,13 @@ function App() {
 
     explosionSegmentsRef.current = snakeRef.current.map((seg, idx) => {
       let angle = Math.random() * Math.PI * 2;
-      let speed = 7 + Math.random() * 8;
-      let segColor = randomColor();
-      if (idx === 0) segColor = "#fff200";
+      let speed = 6 + Math.random() * 7; // Slightly slower for water effect
+      let segColor = getWaterColor();
+      if (idx === 0) segColor = "#00e5ff"; // Bright cyan for head (water splash)
       return {
         ...seg,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
+        vy: Math.sin(angle) * speed - 2, // Initial upward motion for splash
         alpha: 1,
         color: segColor,
         trail: [{ x: seg.x, y: seg.y, alpha: 1 }]
