@@ -1,336 +1,152 @@
-# Snake Quiz Game - Original and React Versions
+# Tuna Quiz Game (React)
 
-This repository contains two implementations of the Snake Quiz Game:
-1. **Original Version** - Vanilla JavaScript + PHP
-2. **React Version** - Modern React implementation
+An interactive gamified assessment that builds on the classic Snake game. You play as a Māori Tuna (eel) and answer multiple‑choice questions by steering the tuna to eat the crab labelled with the correct answer. It’s designed to make assessment more engaging than traditional multiple‑choice quizzes, while heavily enhancing the anti-cheat aspect by using a quick-paced, highly interactive game that essentially prevents students from searching for answers.
 
-## Quick Navigation
+This repository contains:
+- React frontend (the game)
+- Node.js/Express backend
 
-### 📁 Implementations
+---
 
-- **`comp705-01/`** - Original vanilla JavaScript version (English Level 01)
-- **`comp705-02/`** - Original vanilla JavaScript version (English Level 02)
-- **`react-snake-game/`** - ✨ NEW: React implementation
+## How the Game Works
 
-### 📚 Documentation
+- Goal: Answer each question by eating the crab with the correct option (A, B, C, or D).
+- Display: The current question appears on screen, and answers appear as labelled worms on the board.
+- Progress: Eating the crab with the correct answer increases your score and length; the next question appears and the game gradually gets faster.
+- Game Over:
+  - Hitting a wall or your own tail ends the run.
+  - Eating a crab with the wrong answer also ends the run.
+- Leaderboard: Your best run (level/time) can be saved to the leaderboard. It shows top performers for each question bank.
 
-- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Project overview and achievements
-- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - How to run and deploy both versions
-- **[COMPARISON.md](COMPARISON.md)** - Detailed comparison between implementations
-- **[VISUAL_TESTING.md](VISUAL_TESTING.md)** - Testing checklist for verification
-- **[USER_ACCOUNTS.md](USER_ACCOUNTS.md)** - ✨ NEW: User authentication and question bank management
-- **[RUNNING_THE_APP.md](RUNNING_THE_APP.md)** - How to run the Node.js backend and React frontend
+### Controls
+- S — Start the game
+- Arrow Keys or WASD — Turn the tuna
 
-## About the Game
 
-Snake Quiz Game is an innovative educational tool that combines the classic Snake game with multiple-choice questions. Players must navigate a snake to eat the "worm" with the correct answer while avoiding wrong answers and obstacles.
+Accessibility tip: The game is keyboard‑first; ensure the game canvas is focused (click it once) if keys don’t respond.
 
-### Key Features
+---
 
-- 🐍 Classic snake gameplay with quiz twist
-- 📚 Multiple-choice questions (A, B, C, D)
-- 🏆 Real-time leaderboard
-- ⚡ Progressive difficulty
-- 🎨 Beautiful visual effects
-- 📱 Responsive design
-- 🔐 **NEW**: User authentication (student/admin accounts)
-- 📊 **NEW**: Question bank management (admin feature)
-- 🎯 **NEW**: Selectable question banks per user
-- 📤 **NEW**: Bulk question upload via JSON (admin feature)
-- 🎮 **NEW**: Practice mode for struggling players
+## Requirements for running the app
 
-## Getting Started
+- A computer with a web browser (Chrome, Firefox, Edge, or Safari).
+- Node.js (LTS version) — This lets you run JavaScript outside the browser.
+  - Download from: https://nodejs.org
+  - npm (the Node Package Manager) is included when you install Node.js.
+- MySQL Community Server — The database used to store questions and leaderboard scores.
+  - Download from: https://dev.mysql.com/downloads/mysql/
+- Optional: Git (https://git-scm.com) to clone this repository, or you can download the ZIP from GitHub.
 
-### Quick Setup (React Version with User Accounts)
+---
 
-1. **Database Setup**
-```bash
-# Create database and run migrations
-mysql -u root -p < SNAKE.sql
-mysql -u root -p SNAKE < migrations/001_add_user_accounts.sql
+## Project Structure (Quick Tour)
+
+```
+Tuna_QuizGame/
+├── react-snake-game/       # React frontend (the game)
+├── backend/                # Node.js backend (recommended)
+├── TUNA.sql                # Database schema
 ```
 
-2. **Backend Setup**
+---
+
+## Quick Start
+
+Follow these steps in order. Commands shown work in macOS, Linux, and any terminal in Windows. When you see “mysql -u root -p”, you’ll be asked for your MySQL password.
+
+### 1) Set up the database
+
+Open a terminal/shell and go to the project folder:
+```bash
+cd Tuna_QuizGame
+```
+
+Create the database and tables using the provided SQL file:
+```bash
+mysql -u root -p < TUNA.sql
+```
+
+Notes:
+- Replace root with your MySQL username if different.
+
+### 2) Start the backend (Node.js/Express)
+
+The backend provides API endpoints the game uses to load questions and save scores.
+
 ```bash
 cd backend
 npm install
 cp .env.example .env
-# Edit .env with your database credentials
+```
+
+Edit the new .env file and set your MySQL login details:
+```
+DB_HOST=localhost 
+DB_USER=your_mysql_username
+DB_PASSWORD=your_mysql_password
+DB_NAME=SNAKE
+PORT=5000
+CORS_ORIGIN=http://localhost:3000 (or the base url you will be hosting the frontend)
+```
+
+Start the backend:
+```bash
+# Development mode (auto-restart on file changes)
+npm run dev
+
+# Or production mode
 npm start
 ```
 
-3. **Frontend Setup**
+You should see it running at:
+- Backend: http://localhost:5000
+
+### 3) Start the frontend (React game)
+
+Open a new terminal window/tab:
 ```bash
-cd react-snake-game
+cd Tuna_QuizGame/react-snake-game
 npm install
 npm start
 ```
 
-4. **Access the App**
-- Open http://localhost:3000
-- Register a new account (choose admin for full features)
-- Start playing!
+This will open:
+- Game: http://localhost:3000
 
-For detailed instructions, see [RUNNING_THE_APP.md](RUNNING_THE_APP.md) and [USER_ACCOUNTS.md](USER_ACCOUNTS.md).
-
-### New Features Documentation
-
-- **[BULK_UPLOAD_GUIDE.md](BULK_UPLOAD_GUIDE.md)** - How to use the bulk question upload feature
-- **[PRACTICE_MODE_GUIDE.md](PRACTICE_MODE_GUIDE.md)** - How the practice mode detection works
-
-### Option 1: Original Version (Vanilla JS)
-
-```bash
-# Start PHP server from repository root
-php -S localhost:8000
-
-# Open in browser
-http://localhost:8000/comp705-01/
-```
-
-### Option 2: React Version
-
-```bash
-# Start PHP backend (from repository root)
-php -S localhost:8000
-
-# In a new terminal, start React app
-cd react-snake-game
-npm install
-npm start
-
-# Opens automatically at http://localhost:3000
-```
-
-## Which Version Should I Use?
-
-### Use Original Version If:
-- ✅ You want simple deployment (no build step)
-- ✅ You're learning vanilla JavaScript
-- ✅ You need minimal hosting requirements
-- ✅ You want to make quick edits
-
-### Use React Version If:
-- ✅ You prefer modern development tools
-- ✅ You want better code organization
-- ✅ You need automated testing
-- ✅ You're building a larger application
-- ✅ You want TypeScript support (easy to add)
-
-## Feature Comparison
-
-| Feature | Original | React |
-|---------|----------|-------|
-| Game Logic | ✅ | ✅ |
-| Visual Effects | ✅ | ✅ |
-| Backend APIs | ✅ | ✅ (same) |
-| Leaderboard | ✅ | ✅ |
-| Mobile Support | ✅ | ✅ |
-| Build Step | ❌ | ✅ |
-| Hot Reloading | ❌ | ✅ |
-| Testing Support | ⚠️ Manual | ✅ Jest/RTL |
-| Bundle Size | ~63 KB | ~65 KB |
-
-## Technology Stack
-
-### Original Version
-- Vanilla JavaScript (ES6+)
-- HTML5 Canvas
-- PHP 7.4+
-- MySQL
-- CSS3
-
-### React Version
-- React 19.2.0
-- HTML5 Canvas (via refs)
-- PHP 7.4+ (backend)
-- MySQL (backend)
-- CSS3
-
-## Project Structure
-
-```
-Tuna_QuizGame/
-├── comp705-01/              # Original English Level 01
-│   ├── index.php           # Entry point
-│   ├── snake.js            # Game logic
-│   ├── snake.css           # Styles
-│   └── ... (more files)
-│
-├── comp705-02/              # Original English Level 02
-│
-├── react-snake-game/        # React implementation
-│   ├── src/
-│   │   ├── App.js          # Main component
-│   │   ├── App.css         # Styles
-│   │   └── index.js        # Entry point
-│   ├── public/
-│   └── package.json
-│
-├── db-config.php            # Database config
-├── SNAKE.sql                # Database schema
-└── Documentation files
-```
-
-## Database Setup
-
-```bash
-# Create database and tables
-mysql -u root -p < SNAKE.sql
-
-# Update credentials in db-config.php
-```
-
-## Controls
-
-- **S** - Start game
-- **Arrow Keys** or **WASD** - Move snake
-- **ESC** - Close dialogs (when applicable)
-
-## Development
-
-### Original Version
-```bash
-# Just edit files and refresh browser
-# No build step needed
-```
-
-### React Version
-```bash
-cd react-snake-game
-
-# Development
-npm start          # Start dev server with hot reload
-
-# Production
-npm run build      # Create optimized build
-
-# Testing
-npm test           # Run Jest tests (when added)
-```
-
-## Documentation
-
-### For Users
-1. Read [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) for overview
-2. Follow [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) to run the app
-3. Use [VISUAL_TESTING.md](VISUAL_TESTING.md) to verify appearance
-
-### For Developers
-1. Start with [COMPARISON.md](COMPARISON.md) to understand differences
-2. Read React code in `react-snake-game/src/App.js`
-3. Check original code in `comp705-01/` for reference
-
-## Testing
-
-### Original Version
-- Manual testing via browser
-- PHP error logs
-- Browser DevTools
-
-### React Version
-- Same as above, plus:
-- Jest for unit tests
-- React Testing Library
-- Cypress for E2E (can be added)
-
-## Deployment
-
-### Development
-- Use built-in PHP server: `php -S localhost:8000`
-- Use React dev server: `npm start`
-
-### Production
-- Original: Copy to Apache/Nginx document root
-- React: Build and serve with static server + PHP backend
-
-See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed instructions.
-
-## Browser Support
-
-Both versions work on:
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
-- Mobile browsers
-
-## Performance
-
-- **FPS**: 60 (both versions)
-- **Load Time**: < 3 seconds
-- **Bundle Size**: ~65 KB gzipped
-- **Memory**: 15-20 MB
-
-## Security
-
-- Cookie-based authentication
-- SQL injection protection (prepared statements)
-- XSS protection (React escaping, PHP htmlspecialchars)
-- Input validation
-- CORS considerations documented
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make changes
-4. Test thoroughly
-5. Submit pull request
-
-## Credits
-
-**Original Game**: Minh Nguyen @ AUT
-
-**React Implementation**: Created as part of the Tuna branch
-
-## License
-
-Apache License 2.0 - See [LICENSE](LICENSE) file
-
-## Support
-
-For issues or questions:
-- Check documentation files first
-- Review code comments
-- Test in browser DevTools
-- Compare original vs React implementations
-
-## Roadmap
-
-### Completed ✅
-- [x] Original vanilla JS implementation
-- [x] React port with feature parity
-- [x] Comprehensive documentation
-- [x] Build and deployment guides
-
-### Future Enhancements 🚀
-- [ ] TypeScript version
-- [ ] Unit and E2E tests
-- [ ] Node.js backend
-- [ ] Multiplayer support
-- [ ] Sound effects
-- [ ] More question sets
-- [ ] Progressive Web App (PWA)
-- [ ] Achievement system
-
-## FAQ
-
-**Q: Which version should I deploy?**
-A: Both are production-ready. Choose based on your team's expertise and deployment requirements.
-
-**Q: Can I use both versions together?**
-A: Yes! They can coexist and use the same database.
-
-**Q: Do I need to modify the PHP backend for React?**
-A: No! React uses the same PHP APIs without any changes.
-
-**Q: Is the React version slower?**
-A: No, both versions run at 60 FPS with negligible performance difference.
-
-**Q: Can I add more questions?**
-A: Yes, use the admin panel (linked in game footer) or directly edit the database.
+You’re ready to play!
 
 ---
 
-**Ready to play?** Choose your version and follow the Getting Started guide above! 🎮
+## Building the App for Production
+
+When you’re ready to create an optimized build of the React game for deployment:
+
+```bash
+cd Tuna_QuizGame/react-snake-game
+npm run build
+```
+
+What this does:
+- Creates a production‑optimized version of the game in react-snake-game/build.
+- Minifies and bundles the code so it loads quickly for users.
+
+How to serve the build locally for a quick test:
+```bash
+# Option A: Use 'serve' (one-time install)
+npm install -g serve
+serve -s build -l 3000
+
+# Option B: npx (no global install)
+npx serve -s build -l 3000
+```
+
+Keep the backend running (port 5000) so the built app can call the APIs.
+
+Deployment options:
+- Any static file host (Netlify, GitHub Pages, etc.) for the frontend build, plus your backend (Node.js) on a server/VPS/Platform-as-a-Service.
+- See backend/README.md for containerization and hosting tips (Docker, Heroku, AWS, etc.).
+
+## Credits and License
+
+- Original Game: Professor Minh Nguyen @ AUT
+- License: Apache 2.0 (see LICENSE)

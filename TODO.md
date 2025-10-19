@@ -1,0 +1,1 @@
+1. Develop an accessibility mode where clicking on the crab auto-pilots the tuna to the answer.
