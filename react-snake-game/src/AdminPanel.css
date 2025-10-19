@@ -336,21 +336,13 @@
 }
 
 .delete-bank-button {
-  background: #ff5252;
-  border: none;
-  color: #ffffff;
+  background: transparent;
+  border: 1px solid red;
+  color: #ff5252;
   font-size: 1.4rem;
   padding: 8px 16px;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(255, 82, 82, 0.3);
-}
-
-.delete-bank-button:hover:not(:disabled) {
-  background: #ff1744;
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.5);
 }
 
 .delete-bank-button:disabled {

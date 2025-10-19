@@ -35,45 +35,7 @@ function AdminPanel({ onClose, translations }) {
   const [bulkUploadBank, setBulkUploadBank] = useState('');
   const [bulkJsonText, setBulkJsonText] = useState('');
 
-  const t = translations || {
-    adminPanelTitle: 'Admin Panel',
-    createBankTab: 'Create Bank',
-    addQuestionsTab: 'Add Questions',
-    bulkUploadTab: 'Bulk Upload',
-    manageBanksTab: 'Manage Banks',
-    close: 'Close',
-    folder: 'Folder ID',
-    name: 'Bank Name',
-    description: 'Description (optional)',
-    createButton: 'Create Question Bank',
-    selectBank: 'Select Bank',
-    questionText: 'Question Text',
-    optionA: 'Option A',
-    optionB: 'Option B',
-    optionC: 'Option C',
-    optionD: 'Option D',
-    correctAnswer: 'Correct Answer',
-    addQuestionButton: 'Add Question',
-    bulkUploadButton: 'Upload Questions',
-    bulkJsonLabel: 'Paste JSON or Upload File',
-    bulkJsonPlaceholder: 'Paste JSON array of questions here...',
-    bulkFileUpload: 'Or choose a JSON file',
-    bulkUploadSuccess: 'Successfully uploaded',
-    bulkUploadFailed: 'Failed to upload',
-    bulkUploadInvalidJson: 'Invalid JSON format',
-    loading: 'Loading...',
-    bankName: 'Bank Name',
-    questionPlaceholder: 'Enter your question here...',
-    optionPlaceholder: 'Enter option text...',
-    manageBanksTitle: 'Manage Question Banks',
-    questionCount: 'Questions',
-    deleteBank: 'Delete',
-    confirmDeleteTitle: 'Confirm Delete',
-    confirmDeleteMessage: 'Are you sure you want to delete this question bank? This will also delete all leaderboard data for this bank. This action cannot be undone.',
-    confirmDeleteButton: 'Yes, Delete',
-    cancelButton: 'Cancel',
-    deleteBankSuccess: 'Question bank deleted successfully'
-  };
+  const t = translations;
 
   useEffect(() => {
     loadQuestionBanks();
@@ -302,10 +264,13 @@ function AdminPanel({ onClose, translations }) {
 
       setSuccess(t.deleteBankSuccess);
       setBankToDelete(null);
-      loadQuestionBanks();
+      
+      // Reload the page after successful deletion
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (err) {
       setError(err.message);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -582,7 +547,7 @@ function AdminPanel({ onClose, translations }) {
               
               {banks.length === 0 ? (
                 <div style={{ color: '#aaa', textAlign: 'center', padding: '40px' }}>
-                  No question banks available
+                  {t.noBanksAvailable}
                 </div>
               ) : (
                 <div className="banks-list">
