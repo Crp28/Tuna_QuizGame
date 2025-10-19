@@ -30,6 +30,15 @@ const getColor = (() => {
   };
 })();
 
+// Water-themed color palette for Maori ocean theme
+const getWaterColor = () => {
+  const waterHues = [180, 190, 195, 200, 210]; // Cyan/turquoise/blue range
+  const h = waterHues[Math.floor(Math.random() * waterHues.length)];
+  const s = 70 + Math.floor(Math.random() * 25); // 70-95% saturation
+  const l = 55 + Math.floor(Math.random() * 25); // 55-80% lightness
+  return `hsl(${h},${s}%,${l}%)`;
+};
+
 const getRandomQuestion = (questions, usedQuestions) => {
   if (!questions || questions.length === 0) {
     console.error('No questions available');
@@ -154,6 +163,12 @@ function App() {
   const slowGlowPhaseRef = useRef(0);
   const slowGlowAlphaRef = useRef(0);
 
+  // Explosion animation refs
+  const isExplodingRef = useRef(false);
+  const explosionStartRef = useRef(0);
+  const explosionSegmentsRef = useRef([]);
+  const shakeStartRef = useRef(0);
+
   // Authoritative high-frequency game state (refs)
   const snakeRef = useRef([
     { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
@@ -272,6 +287,163 @@ function App() {
       setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
     }
   }, [questions, currentQuestion]);
+
+  // Water splash explosion animation loop - Maori ocean theme
+  const explosionLoop = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const MAX_TRAIL = 15;
+    const SHAKE_MAGNITUDE = 12; // Gentler shake for water theme
+
+    const elapsed = Date.now() - explosionStartRef.current;
+    const shake = Math.max(0, SHAKE_MAGNITUDE * (1 - (elapsed / 500)));
+    const offsetX = (Math.random() - 0.5) * shake;
+    const offsetY = (Math.random() - 0.5) * shake;
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, offsetX, offsetY);
+    ctx.clearRect(-offsetX, -offsetY, canvas.width, canvas.height);
+
+    let done = true;
+
+    if (explosionSegmentsRef.current.length > 0) {
+      const head = explosionSegmentsRef.current[0];
+      const centerX = head.x + GRID_SIZE / 2;
+      const centerY = head.y + GRID_SIZE / 2;
+
+      // 🌊 Water ripple waves expanding outward
+      const numRipples = 4;
+      for (let i = 0; i < numRipples; i++) {
+        const rippleDelay = i * 150;
+        const rippleElapsed = elapsed - rippleDelay;
+        if (rippleElapsed > 0) {
+          const rippleRadius = rippleElapsed * 0.4;
+          const rippleAlpha = Math.max(0, 0.6 - rippleElapsed / 800);
+
+          ctx.save();
+          ctx.globalAlpha = rippleAlpha;
+          ctx.strokeStyle = `hsla(195, 85%, 70%, ${rippleAlpha})`;
+          ctx.lineWidth = 3 - (i * 0.5);
+          ctx.shadowColor = "#4dd0e1";
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, rippleRadius, 0, 2 * Math.PI);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // 💧 Water droplet spray particles
+      for (let j = 0; j < 20; j++) {
+        const angle = (Math.PI * 2 * j / 20) + (elapsed / 300);
+        const distance = 30 + elapsed * 0.15 + Math.sin(elapsed / 100 + j) * 8;
+        const x = centerX + Math.cos(angle) * distance;
+        const y = centerY + Math.sin(angle) * distance - (elapsed * 0.1); // Slight upward drift
+        const dropletSize = 5 + Math.sin(elapsed / 80 + j) * 3;
+        const alpha = Math.max(0, 0.7 - elapsed / 900);
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.shadowColor = "#26c6da";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = `hsla(190, 80%, 75%, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(x, y, dropletSize, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 🫧 Rising bubbles
+      for (let b = 0; b < 12; b++) {
+        const bubbleX = centerX + (Math.random() - 0.5) * 80;
+        const bubbleY = centerY - (elapsed * 0.2) + b * 15;
+        const bubbleSize = 6 + Math.random() * 8;
+        const bubbleAlpha = Math.max(0, 0.5 - elapsed / 1000);
+
+        if (bubbleAlpha > 0.05) {
+          ctx.save();
+          ctx.globalAlpha = bubbleAlpha * 0.6;
+          ctx.fillStyle = `hsla(180, 60%, 85%, ${bubbleAlpha * 0.4})`;
+          ctx.strokeStyle = `hsla(190, 80%, 90%, ${bubbleAlpha})`;
+          ctx.lineWidth = 2;
+          ctx.shadowColor = "#b2ebf2";
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(bubbleX, bubbleY, bubbleSize, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // 💎 Central splash impact
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 0.4 - elapsed / 600);
+      ctx.shadowColor = "#80deea";
+      ctx.shadowBlur = 40;
+      ctx.fillStyle = `hsla(185, 90%, 80%, ${Math.max(0, 0.3 - elapsed / 600)})`;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 45 + elapsed * 0.12, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 🐟 Tuna segments dispersing with water trails
+    explosionSegmentsRef.current.forEach(seg => {
+      seg.x += seg.vx;
+      seg.y += seg.vy;
+      seg.vy += 0.15; // Gravity effect
+      seg.vx *= 0.98; // Water resistance
+      seg.vy *= 0.98;
+      seg.alpha -= 0.022;
+
+      if (seg.alpha > 0.02) done = false;
+
+      seg.trail.push({ x: seg.x, y: seg.y, alpha: seg.alpha });
+      if (seg.trail.length > MAX_TRAIL) seg.trail.shift();
+
+      // 💧 Flowing water trails
+      for (let i = 0; i < seg.trail.length - 1; i++) {
+        const t0 = seg.trail[i];
+        const t1 = seg.trail[i + 1];
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, t0.alpha * 0.25);
+        ctx.strokeStyle = seg.color;
+        ctx.lineWidth = 7 - 6 * (i / MAX_TRAIL);
+        ctx.shadowColor = seg.color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.moveTo(t0.x + GRID_SIZE / 2, t0.y + GRID_SIZE / 2);
+        ctx.lineTo(t1.x + GRID_SIZE / 2, t1.y + GRID_SIZE / 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 🐠 Segment with water shimmer
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, seg.alpha);
+      ctx.shadowColor = "#4dd0e1";
+      ctx.shadowBlur = 25;
+      ctx.fillStyle = seg.color;
+      ctx.strokeStyle = `hsla(190, 100%, 95%, ${seg.alpha * 0.8})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(seg.x, seg.y, GRID_SIZE, GRID_SIZE, 10);
+      else ctx.rect(seg.x, seg.y, GRID_SIZE, GRID_SIZE);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    ctx.restore();
+
+    if (!done && isExplodingRef.current) {
+      requestAnimationFrame(explosionLoop);
+    }
+  }, []);
 
   // Helper: pick tuna image based on adjacent segments and current direction
   const getTunaImage = useCallback((segment, idx, snakeArr) => {
@@ -521,6 +693,28 @@ function App() {
     setIsGameRunning(false);
     setIsGameOver(true);
 
+    // Trigger explosion animation
+    isExplodingRef.current = true;
+    explosionStartRef.current = Date.now();
+    shakeStartRef.current = Date.now();
+
+    explosionSegmentsRef.current = snakeRef.current.map((seg, idx) => {
+      let angle = Math.random() * Math.PI * 2;
+      let speed = 6 + Math.random() * 7; // Slightly slower for water effect
+      let segColor = getWaterColor();
+      if (idx === 0) segColor = "#00e5ff"; // Bright cyan for head (water splash)
+      return {
+        ...seg,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 2, // Initial upward motion for splash
+        alpha: 1,
+        color: segColor,
+        trail: [{ x: seg.x, y: seg.y, alpha: 1 }]
+      };
+    });
+
+    requestAnimationFrame(explosionLoop);
+
     // Practice mode detection (unchanged logic, adapted to refs where needed)
     if (!isPracticeMode && currentGameStart) {
       const gameEndTime = Date.now();
@@ -570,8 +764,11 @@ function App() {
       });
     }
 
-    setShowSplash(true);
-  }, [user, currentGameStart, lastMoveTime, performanceHistory, practiceModeDisabled, isPracticeMode, currentBank]);
+    // Delay showing splash until after explosion completes
+    setTimeout(() => {
+      setShowSplash(true);
+    }, 1100);
+  }, [user, currentGameStart, lastMoveTime, performanceHistory, practiceModeDisabled, isPracticeMode, currentBank, explosionLoop]);
 
   const detectStrugglingPlayer = (recentGames) => {
     let strugglingCount = 0;
