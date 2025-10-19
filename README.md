@@ -39,13 +39,13 @@ Accessibility tip: The game is keyboard‑first; ensure the game canvas is focus
 
 ---
 
-## Project Structure (Quick Tour)
+## Project Structure
 
 ```
 Tuna_QuizGame/
 ├── react-snake-game/       # React frontend (the game)
 ├── backend/                # Node.js backend (recommended)
-├── TUNA.sql                # Database schema
+├── TUNA.sql                # Database schema and prepopolate question bank data
 ```
 
 ---
