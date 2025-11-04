@@ -165,6 +165,18 @@ router.post('/attempt', requireAuth, async (req, res) => {
     const correctOptionId = assessment.mapping[itemId];
     const isCorrect = optionId === correctOptionId;
     
+    // Find the correct option details (label and text) for wrong answers
+    let correctAnswerInfo = null;
+    if (!isCorrect) {
+      const correctOption = currentItem.options.find(opt => opt.optionId === correctOptionId);
+      if (correctOption) {
+        correctAnswerInfo = {
+          label: correctOption.label,
+          text: correctOption.text
+        };
+      }
+    }
+    
     // Advance to next question
     assessment.index++;
     assessment.seq++;
@@ -174,8 +186,13 @@ router.post('/attempt', requireAuth, async (req, res) => {
       correct: isCorrect
     };
     
+    // Include correct answer info if wrong
+    if (!isCorrect && correctAnswerInfo) {
+      response.correctAnswer = correctAnswerInfo;
+    }
+    
     // If there's a next question, include it
-    if (assessment.index < assessment.queue.length) {
+    if (isCorrect && assessment.index < assessment.queue.length) {
       const nextItem = assessment.queue[assessment.index];
       response.nextItem = {
         itemId: nextItem.itemId,

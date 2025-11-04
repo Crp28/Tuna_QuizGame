@@ -209,9 +209,9 @@ function App() {
   const [lastMoveTime, setLastMoveTime] = useState(null);
 
   // Assessed mode state (server-authoritative)
-  const [isAssessedMode, setIsAssessedMode] = useState(false); // eslint-disable-line no-unused-vars
   const [assessmentSession, setAssessmentSession] = useState(null); // { itemId, seq, isVerifying }
   const [verificationError, setVerificationError] = useState(null); // eslint-disable-line no-unused-vars
+  const [lastCorrectAnswer, setLastCorrectAnswer] = useState(null); // Store correct answer after wrong selection
 
   // Canvas & images
   const canvasRef = useRef(null);
@@ -933,8 +933,11 @@ function App() {
         }, 2000);
 
       } else {
-        // Wrong answer - end game
+        // Wrong answer - store correct answer and end game
         isVerifyingRef.current = false;
+        if (result.correctAnswer) {
+          setLastCorrectAnswer(result.correctAnswer);
+        }
         setAssessmentSession(null);
         endGame();
       }
@@ -977,91 +980,15 @@ function App() {
       if (eatenIdx !== -1) {
         const worm = wormsRef.current[eatenIdx];
         
-        // Assessed mode: async server validation
-        if (isAssessedMode) {
-          // Don't continue moving while verifying
-          if (isVerifyingRef.current) {
-            return true; // Keep game running but paused
-          }
-          
-          // Trigger async validation
-          handleAssessedModeCollision(worm, newSnake);
-          return true; // Game continues, validation happens async
+        // Server-authoritative validation (always)
+        // Don't continue moving while verifying
+        if (isVerifyingRef.current) {
+          return true; // Keep game running but paused
         }
         
-        // Practice mode: client-side validation
-        if (worm.isCorrect) {
-          // Level up
-          levelRef.current = (levelRef.current || 1) + 1;
-          setLevel(levelRef.current);
-
-          // Leaderboard (non practice)
-          if (!isPracticeMode && user) {
-            const newEntry = {
-              name: user.username,
-              level: levelRef.current,
-              time: startTimeRef.current ? ((Date.now() - startTimeRef.current) / 1000).toFixed(2) : 0,
-              folder: currentBank
-            };
-            setLeaderboard(prev => {
-              const idx = prev.findIndex(e => e.name === user.username);
-              const updated = idx !== -1 ? Object.assign([...prev], { [idx]: newEntry }) : [...prev, newEntry];
-              updated.sort((a, b) => b.level - a.level || a.time - b.time);
-              fetch('/api/leaderboard', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newEntry)
-              }).catch(err => console.error('Failed to save score:', err));
-              return updated;
-            });
-          }
-
-          // Next question + worms
-          const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
-          if (question) {
-            setCurrentQuestion(question);
-            usedQuestionsRef.current = newUsed;
-            setUsedQuestions(newUsed);
-
-            const newWorms = generateWormsForQuestion(question, newSnake);
-            wormsRef.current = newWorms;
-            setWorms(newWorms);
-          }
-
-          // Commit snake
-          snakeRef.current = newSnake;
-
-          // Slow-motion effect
-          isSlowRef.current = true;
-          setIsSlow(true);
-          setTimeout(() => {
-            isSlowRef.current = false;
-            setIsSlow(false);
-          }, 2000);
-
-          // Next level CTA
-          if (!isPracticeMode && usedQuestionsRef.current && usedQuestionsRef.current.length >= Math.ceil(questions.length / 2)) {
-            setShowNextLevel(true);
-          }
-
-          // Question animation
-          const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
-          setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
-
-          // After a successful move, promote pending turn (if valid vs new direction)
-          if (pendingDirRef.current) {
-            const pd = pendingDirRef.current;
-            if (!isOpposite(pd, directionRef.current) && !isSame(pd, directionRef.current)) {
-              nextDirRef.current = pd;
-            }
-            pendingDirRef.current = null;
-          }
-
-          return true;
-        } else {
-          endGame();
-          return false;
-        }
+        // Trigger async validation
+        handleAssessedModeCollision(worm, newSnake);
+        return true; // Game continues, validation happens async
       } else {
         // Move forward (pop tail)
         newSnake.pop();
@@ -1138,11 +1065,11 @@ function App() {
       clearInterval(logicIntervalId);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [isGameRunning, isPracticeMode, drawGame, endGame, questions, isAssessedMode, handleAssessedModeCollision, user, currentBank]);
+  }, [isGameRunning, isPracticeMode, drawGame, endGame, handleAssessedModeCollision, user, currentBank]);
 
   const startGame = useCallback(async () => {
-    // For assessed mode, fetch from server
-    if (isAssessedMode && user) {
+    // Always use assessed mode with server-authoritative validation
+    if (user) {
       try {
         // Reset explosion state
         isExplodingRef.current = false;
@@ -1175,6 +1102,7 @@ function App() {
         setShowNextLevel(false);
         setShowPracticeModePopup(false);
         setVerificationError(null);
+        setLastCorrectAnswer(null);
 
         // Start assessment session
         const data = await startAssessment(currentBank);
@@ -1205,62 +1133,9 @@ function App() {
       return;
     }
 
-    // Practice mode (existing logic)
-    if (!questions || questions.length === 0) {
-      console.error('No questions available');
-      return;
-    }
-
-    // Reset explosion state
-    isExplodingRef.current = false;
-
-    // Initialize refs
-    const initialSnake = [
-      { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
-      { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
-      { x: GRID_SIZE * 2, y: GRID_SIZE * 8 }
-    ];
-    snakeRef.current = initialSnake;
-    directionRef.current = { x: 0, y: 0 };
-    nextDirRef.current = { x: 0, y: 0 };
-    pendingDirRef.current = null;
-    awaitingInitialMoveRef.current = true;
-    isSlowRef.current = false;
-    levelRef.current = 1;
-    startTimeRef.current = null; // set on first input
-
-    // UI state
-    setIsGameOver(false);
-    setLevel(1);
-    setUsedQuestions([]);
-    setStartTime(null);
-    setCurrentGameStart(Date.now());
-    setLastMoveTime(null);
-    lastStepTimeRef.current = 0;
-    setAwaitingInitialMove(true);
-    setShowSplash(false);
-    setShowNextLevel(false);
-    setShowPracticeModePopup(false); // Close practice mode popup if open
-
-    const { question, usedQuestions: newUsed } = getRandomQuestion(questions, []);
-    if (!question) {
-      console.error('Could not get a valid question');
-      return;
-    }
-
-    setCurrentQuestion(question);
-    usedQuestionsRef.current = newUsed;
-    setUsedQuestions(newUsed);
-
-    const newWorms = generateWormsForQuestion(question, initialSnake);
-    wormsRef.current = newWorms;
-    setWorms(newWorms);
-
-    const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
-    setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
-
-    setIsGameRunning(true);
-  }, [questions, isAssessedMode, user, currentBank]);
+    // Fallback if no user (shouldn't happen)
+    console.error('No user authenticated');
+  }, [user, currentBank]);
 
   const handlePracticeModeAccept = (dontShowAgain) => {
     setIsPracticeMode(true);
@@ -1675,6 +1550,37 @@ function App() {
                 <div style={{ fontSize: '2.1rem', fontWeight: '600', marginBottom: '12px' }}>
                   {isGameOver ? `${t.splashPlayAgain} ${user.name}?` : `${t.splashReady} ${user.name}?`}
                 </div>
+                
+                {/* Show correct answer after death */}
+                {isGameOver && lastCorrectAnswer && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(129, 255, 129, 0.15) 0%, rgba(129, 255, 129, 0.05) 100%)',
+                    border: '2px solid #81ff81',
+                    borderRadius: '12px',
+                    padding: '12px 20px',
+                    marginBottom: '15px',
+                    boxShadow: '0 0 20px rgba(129, 255, 129, 0.3)',
+                    animation: 'pulse 2s ease-in-out infinite'
+                  }}>
+                    <div style={{ 
+                      fontSize: '1rem', 
+                      color: '#ffe082', 
+                      marginBottom: '6px',
+                      fontWeight: '500'
+                    }}>
+                      💡 The correct answer was:
+                    </div>
+                    <div style={{
+                      fontSize: '1.3rem',
+                      fontWeight: 'bold',
+                      color: '#81ff81',
+                      textShadow: '0 0 10px rgba(129, 255, 129, 0.5)'
+                    }}>
+                      {lastCorrectAnswer.label}: {lastCorrectAnswer.text}
+                    </div>
+                  </div>
+                )}
+                
                 <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>
                   {t.splashStartPrompt}
                 </div>

@@ -154,11 +154,15 @@ Response (correct answer):
 Response (wrong answer):
 ```json
 {
-  "correct": false
+  "correct": false,
+  "correctAnswer": {
+    "label": "A",
+    "text": "A library"
+  }
 }
 ```
 
-**Note:** When the assessment is complete (no more questions), `nextItem` is omitted from the response.
+**Note:** When the answer is wrong, the `correctAnswer` field is included with the label and text of the correct option. When the assessment is complete (no more questions), `nextItem` is omitted from the response.
 
 ### Get Leaderboard
 ```http

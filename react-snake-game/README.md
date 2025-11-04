@@ -1,6 +1,6 @@
 # Snake Quiz Game - React Version with Node.js Backend
 
-This is a React implementation of the Snake Quiz Game with a modern Node.js/Express backend.
+This is a React implementation of the Snake Quiz Game with a modern Node.js/Express backend featuring **server-authoritative assessment** for secure, cheat-proof gameplay.
 
 ## Architecture
 
@@ -8,19 +8,49 @@ This is a React implementation of the Snake Quiz Game with a modern Node.js/Expr
 React Frontend (port 3000) ↔ Node.js Backend (port 5000) ↔ MySQL Database
 ```
 
+## Key Security Feature: Server-Authoritative Assessment
+
+The game now uses a **server-authoritative assessment flow** where:
+- ✅ **Correct answers never sent to client** - Only question text and shuffled options with opaque IDs
+- ✅ **Server validates all selections** - Prevents answer inspection or automated cheating
+- ✅ **Smooth gameplay maintained** - Slow-motion effect hides network latency (~50-150ms)
+- ✅ **Answer feedback on death** - Shows correct answer after wrong selection for learning
+
+### How It Works
+
+1. **Game Start**: Client calls `/api/assessments/start` to begin
+   - Server shuffles questions and option order
+   - Server generates opaque UUIDs for each option
+   - Server stores correct answer mapping in session
+   - Client receives question and options (NO answer field)
+
+2. **Collision Detection**: When player hits a worm
+   - Game triggers slow-motion effect immediately
+   - Client sends `{ itemId, optionId, seq }` to `/api/assessments/attempt`
+   - Server validates choice and returns `{ correct: boolean, correctAnswer?: {...}, nextItem?: {...} }`
+   - If correct: snake grows, next question loaded
+   - If wrong: game ends, correct answer displayed
+
+3. **Security Benefits**:
+   - Cannot inspect network responses to find answers
+   - Cannot inspect React state to find answer mapping
+   - Cannot automate answer selection scripts
+   - Server maintains authoritative game state
+
 ## Features
 
-- ✅ All game logic ported to React
+- ✅ All game logic in React with server-authoritative validation
 - ✅ Snake movement with keyboard controls (WASD or Arrow keys)
 - ✅ Question and answer system with worms
-- ✅ Collision detection
+- ✅ Collision detection with server validation
 - ✅ Score and level tracking
 - ✅ Global leaderboard with database persistence
 - ✅ **Node.js/Express backend** - Modern REST API
-- ✅ **No base64 encoding** - Simpler data format
+- ✅ **Server-side correctness validation** - Cheat-proof assessment
+- ✅ **Answer feedback after death** - Educational feedback
 - ✅ Similar art style and animations
-- ✅ Slow-motion effect on correct answers
-- ✅ Login system with cookies
+- ✅ Slow-motion effect on collisions (hides network latency)
+- ✅ Login system with cookies and sessions
 - ✅ Next level progression
 
 ## Setup
@@ -133,10 +163,42 @@ Works on all modern browsers that support:
 
 ## API Endpoints
 
-### Get Questions
+### Assessment API (Server-Authoritative)
+
+#### Start Assessment
+```http
+POST /api/assessments/start
+Content-Type: application/json
+
+{
+  "folder": "comp705-01"
+}
+```
+
+Returns first question with shuffled options (NO answer field).
+
+#### Submit Answer
+```http
+POST /api/assessments/attempt
+Content-Type: application/json
+
+{
+  "itemId": "uuid-here",
+  "optionId": "uuid-here",
+  "seq": 0
+}
+```
+
+Returns validation result and next question (if correct).
+
+### Legacy Endpoints
+
+#### Get Questions (Admin/Practice Only)
 ```http
 GET /api/questions?folder=comp705-01
 ```
+
+⚠️ **Note**: Returns questions WITH answers - only for admin question management, not for assessed gameplay.
 
 ### Get Leaderboard
 ```http
@@ -155,6 +217,8 @@ Content-Type: application/json
   "folder": "comp705-01"
 }
 ```
+
+See `backend/README.md` for complete API documentation.
 
 ## Development
 

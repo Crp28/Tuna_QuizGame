@@ -422,3 +422,14 @@ canvas {
 .login-form button:hover {
   background: #ffb300;
 }
+/* Pulse animation for correct answer display */
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(129, 255, 129, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(129, 255, 129, 0.5);
+    transform: scale(1.02);
+  }
+}
