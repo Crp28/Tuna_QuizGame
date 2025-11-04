@@ -877,13 +877,14 @@ function App() {
               currentQuestionIndexRef.current = questionIndex;
               usedQuestionsRef.current = newUsed;
 
+              // Commit snake FIRST before generating worms, so worm positions are calculated
+              // with the correct snake reference
+              snakeRef.current = newSnake;
+
               const newWorms = generateWormsForQuestion(question, newSnake);
               wormsRef.current = newWorms;
               setWorms(newWorms);
             }
-
-            // Commit snake
-            snakeRef.current = newSnake;
 
             // Slow-motion effect
             isSlowRef.current = true;
