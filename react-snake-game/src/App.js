@@ -688,13 +688,16 @@ function App() {
     });
   }, [getTunaImage]);
 
-  // Update game time
+  // Update game time - starts when first input is received
   useEffect(() => {
-    if (isGameRunning && startTimeRef.current) {
-      const interval = setInterval(() => {
-        setGameTime((Date.now() - startTimeRef.current) / 1000);
+    if (isGameRunning) {
+      // Check periodically if timer should start
+      const checkInterval = setInterval(() => {
+        if (startTimeRef.current) {
+          setGameTime((Date.now() - startTimeRef.current) / 1000);
+        }
       }, 100);
-      return () => clearInterval(interval);
+      return () => clearInterval(checkInterval);
     }
   }, [isGameRunning]);
 
@@ -1081,6 +1084,7 @@ function App() {
     // UI state
     setIsGameOver(false);
     setLevel(1);
+    setGameTime(0); // Reset timer
     setCurrentGameStart(Date.now());
     setLastMoveTime(null);
     lastStepTimeRef.current = 0;
@@ -1173,6 +1177,7 @@ function App() {
             // It will be set to false after the first move executes in gameLogicLoop
             const now = Date.now();
             startTimeRef.current = now;
+            setGameTime(0); // Initialize timer state to trigger timer effect
             lastStepTimeRef.current = now;
             directionRef.current = newDir; // visual orientation
             setLastMoveTime(now);
