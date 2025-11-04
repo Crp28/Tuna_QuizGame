@@ -79,6 +79,87 @@ Response:
 
 **Note:** Questions are returned in plain JSON (no base64 encoding needed!)
 
+**⚠️ Security Note:** This endpoint includes the correct `answer` field and should only be used for practice mode or admin/question bank management. For assessed gameplay where correctness must be verified server-side, use the Assessment API endpoints below.
+
+### Assessment API (Server-Authoritative)
+
+#### Start Assessment Session
+```http
+POST /api/assessments/start
+Content-Type: application/json
+
+{
+  "folder": "comp705-01"
+}
+```
+
+Response:
+```json
+{
+  "itemId": "550e8400-e29b-41d4-a716-446655440000",
+  "question": "What is React?",
+  "options": [
+    {
+      "optionId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "label": "A",
+      "text": "A library"
+    },
+    {
+      "optionId": "3f333df6-90a4-4fda-8dd3-9485d27cee36",
+      "label": "B",
+      "text": "A framework"
+    },
+    {
+      "optionId": "16fd2706-8baf-433b-82eb-8c7fada847da",
+      "label": "C",
+      "text": "A language"
+    },
+    {
+      "optionId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "label": "D",
+      "text": "A database"
+    }
+  ],
+  "seq": 0
+}
+```
+
+**Security:** The correct answer is NOT included. Options are shuffled and assigned opaque UUIDs. The server maintains the mapping between `optionId` and correctness in the session.
+
+#### Submit Answer Attempt
+```http
+POST /api/assessments/attempt
+Content-Type: application/json
+
+{
+  "itemId": "550e8400-e29b-41d4-a716-446655440000",
+  "optionId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "seq": 0
+}
+```
+
+Response (correct answer):
+```json
+{
+  "correct": true,
+  "nextItem": {
+    "itemId": "660e8400-e29b-41d4-a716-446655440001",
+    "question": "What is Node.js?",
+    "options": [...],
+    "seq": 1
+  }
+}
+```
+
+Response (wrong answer):
+```json
+{
+  "correct": false
+}
+```
+
+**Note:** When the assessment is complete (no more questions), `nextItem` is omitted from the response.
+
 ### Get Leaderboard
 ```http
 GET /api/leaderboard?folder=comp705-01
