@@ -100,7 +100,7 @@ const generateWormsForQuestion = (question, snake) => {
     x: positions[i].x,
     y: positions[i].y,
     label,
-    isCorrect: question && question.answer ? label === question.answer : false,
+    // Removed isCorrect flag - answer verification now happens server-side
     color: getColor()
   }));
 };
@@ -135,11 +135,19 @@ function App() {
   const [isGameRunning, setIsGameRunning] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [level, setLevel] = useState(1);
+  
+  // These state variables are used via setters to trigger re-renders
+  // The actual values are read from refs for performance in game loop
+  // eslint-disable-next-line no-unused-vars
   const [usedQuestions, setUsedQuestions] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [startTime, setStartTime] = useState(null);
   const [gameTime, setGameTime] = useState(0);
+  // eslint-disable-next-line no-unused-vars
   const [awaitingInitialMove, setAwaitingInitialMove] = useState(true);
+  // eslint-disable-next-line no-unused-vars
   const [isSlow, setIsSlow] = useState(false);
+  
   const [showSplash, setShowSplash] = useState(true);
   const [showNextLevel, setShowNextLevel] = useState(false);
   const [questionAnimationClass, setQuestionAnimationClass] = useState('fade-in');
@@ -184,6 +192,8 @@ function App() {
   const isSlowRef = useRef(false);
   const levelRef = useRef(1);
   const usedQuestionsRef = useRef([]);
+  const currentQuestionRef = useRef(null); // Keep track of current question for verification
+  const isGameRunningRef = useRef(false); // Keep track of game state for async verification
 
   // Preload tuna images and background
   useEffect(() => {
@@ -276,6 +286,7 @@ function App() {
     if (questions.length > 0 && !currentQuestion) {
       const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
       setCurrentQuestion(question);
+      currentQuestionRef.current = question; // Update ref for verification
       usedQuestionsRef.current = newUsed;
       setUsedQuestions(newUsed);
 
@@ -688,10 +699,39 @@ function App() {
     }
   }, [isGameRunning]);
 
+  // Helper function to verify answer with backend
+  const verifyAnswer = useCallback(async (questionText, chosenAnswer) => {
+    try {
+      const response = await fetch('/api/questions/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          questionText,
+          chosenAnswer,
+          folder: currentBank
+        })
+      });
+
+      if (!response.ok) {
+        console.error('Answer verification failed:', response.status);
+        return false;
+      }
+
+      const data = await response.json();
+      return data.correct;
+    } catch (error) {
+      console.error('Error verifying answer:', error);
+      // In case of network error, assume incorrect to be safe
+      return false;
+    }
+  }, [currentBank]);
+
   // End game callback (reads refs)
   const endGame = useCallback(() => {
     setIsGameRunning(false);
     setIsGameOver(true);
+    isGameRunningRef.current = false; // Reset ref
 
     // Trigger explosion animation
     isExplodingRef.current = true;
@@ -786,6 +826,9 @@ function App() {
   // Main game loop with tempo-safe two-stage input buffer
   useEffect(() => {
     if (!isGameRunning) return;
+    
+    // Update ref for async callbacks
+    isGameRunningRef.current = true;
 
     const isOpposite = (a, b) => (a.x + b.x === 0 && a.y + b.y === 0);
     const isSame = (a, b) => (a.x === b.x && a.y === b.y);
@@ -806,78 +849,89 @@ function App() {
       const eatenIdx = (wormsRef.current || []).findIndex(w => w.x === head.x && w.y === head.y);
       if (eatenIdx !== -1) {
         const worm = wormsRef.current[eatenIdx];
-        if (worm.isCorrect) {
-          // Level up
-          levelRef.current = (levelRef.current || 1) + 1;
-          setLevel(levelRef.current);
-
-          // Leaderboard (non practice)
-          if (!isPracticeMode && user) {
-            const newEntry = {
-              name: user.username,
-              level: levelRef.current,
-              time: startTimeRef.current ? ((Date.now() - startTimeRef.current) / 1000).toFixed(2) : 0,
-              folder: currentBank
-            };
-            setLeaderboard(prev => {
-              const idx = prev.findIndex(e => e.name === user.username);
-              const updated = idx !== -1 ? Object.assign([...prev], { [idx]: newEntry }) : [...prev, newEntry];
-              updated.sort((a, b) => b.level - a.level || a.time - b.time);
-              fetch('/api/leaderboard', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newEntry)
-              }).catch(err => console.error('Failed to save score:', err));
-              return updated;
-            });
-          }
-
-          // Next question + worms
-          const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
-          if (question) {
-            setCurrentQuestion(question);
-            usedQuestionsRef.current = newUsed;
-            setUsedQuestions(newUsed);
-
-            const newWorms = generateWormsForQuestion(question, newSnake);
-            wormsRef.current = newWorms;
-            setWorms(newWorms);
-          }
-
-          // Commit snake
-          snakeRef.current = newSnake;
-
-          // Slow-motion effect
-          isSlowRef.current = true;
-          setIsSlow(true);
-          setTimeout(() => {
-            isSlowRef.current = false;
-            setIsSlow(false);
-          }, 2000);
-
-          // Next level CTA
-          if (!isPracticeMode && usedQuestionsRef.current && usedQuestionsRef.current.length >= Math.ceil(questions.length / 2)) {
-            setShowNextLevel(true);
-          }
-
-          // Question animation
-          const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
-          setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
-
-          // After a successful move, promote pending turn (if valid vs new direction)
-          if (pendingDirRef.current) {
-            const pd = pendingDirRef.current;
-            if (!isOpposite(pd, directionRef.current) && !isSame(pd, directionRef.current)) {
-              nextDirRef.current = pd;
+        
+        // Verify answer with backend - the game continues optimistically
+        // If the answer is incorrect, the game will end when the verification completes
+        // Note: Multiple verifications can be in-flight if player eats crabs quickly.
+        // This is intentional - the game will end as soon as ANY incorrect answer is detected.
+        if (currentQuestionRef.current) {
+          verifyAnswer(currentQuestionRef.current.question, worm.label).then(isCorrect => {
+            if (!isCorrect && isGameRunningRef.current) {
+              // Answer was incorrect - end the game immediately
+              endGame();
             }
-            pendingDirRef.current = null;
-          }
-
-          return true;
-        } else {
-          endGame();
-          return false;
+          });
         }
+        
+        // Continue optimistically (assume correct answer)
+        // Level up
+        levelRef.current = (levelRef.current || 1) + 1;
+        setLevel(levelRef.current);
+
+        // Leaderboard (non practice)
+        if (!isPracticeMode && user) {
+          const newEntry = {
+            name: user.username,
+            level: levelRef.current,
+            time: startTimeRef.current ? ((Date.now() - startTimeRef.current) / 1000).toFixed(2) : 0,
+            folder: currentBank
+          };
+          setLeaderboard(prev => {
+            const idx = prev.findIndex(e => e.name === user.username);
+            const updated = idx !== -1 ? Object.assign([...prev], { [idx]: newEntry }) : [...prev, newEntry];
+            updated.sort((a, b) => b.level - a.level || a.time - b.time);
+            fetch('/api/leaderboard', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newEntry)
+            }).catch(err => console.error('Failed to save score:', err));
+            return updated;
+          });
+        }
+
+        // Next question + worms
+        const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
+        if (question) {
+          setCurrentQuestion(question);
+          currentQuestionRef.current = question; // Update ref for verification
+          usedQuestionsRef.current = newUsed;
+          setUsedQuestions(newUsed);
+
+          const newWorms = generateWormsForQuestion(question, newSnake);
+          wormsRef.current = newWorms;
+          setWorms(newWorms);
+        }
+
+        // Commit snake
+        snakeRef.current = newSnake;
+
+        // Slow-motion effect
+        isSlowRef.current = true;
+        setIsSlow(true);
+        setTimeout(() => {
+          isSlowRef.current = false;
+          setIsSlow(false);
+        }, 2000);
+
+        // Next level CTA
+        if (!isPracticeMode && usedQuestionsRef.current && usedQuestionsRef.current.length >= Math.ceil(questions.length / 2)) {
+          setShowNextLevel(true);
+        }
+
+        // Question animation
+        const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
+        setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
+
+        // After a successful move, promote pending turn (if valid vs new direction)
+        if (pendingDirRef.current) {
+          const pd = pendingDirRef.current;
+          if (!isOpposite(pd, directionRef.current) && !isSame(pd, directionRef.current)) {
+            nextDirRef.current = pd;
+          }
+          pendingDirRef.current = null;
+        }
+
+        return true;
       } else {
         // Move forward (pop tail)
         newSnake.pop();
@@ -953,8 +1007,9 @@ function App() {
     return () => {
       clearInterval(logicIntervalId);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+      isGameRunningRef.current = false; // Reset ref on cleanup
     };
-  }, [isGameRunning, isPracticeMode, drawGame, endGame, questions]);
+  }, [isGameRunning, isPracticeMode, drawGame, endGame, questions, verifyAnswer, user, currentBank]);
 
   const startGame = useCallback(() => {
     if (!questions || questions.length === 0) {
@@ -1000,6 +1055,7 @@ function App() {
     }
 
     setCurrentQuestion(question);
+    currentQuestionRef.current = question; // Update ref for verification
     usedQuestionsRef.current = newUsed;
     setUsedQuestions(newUsed);
 
