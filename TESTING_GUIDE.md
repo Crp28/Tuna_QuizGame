@@ -184,6 +184,16 @@ Test the game in:
 - This creates a smooth gameplay experience while maintaining security
 - In case of network errors, the game fails safely by ending the game
 
+## Security Notes
+
+The implementation successfully addresses the primary security issue: correct answers are no longer exposed to the frontend. However, CodeQL analysis identified two pre-existing security concerns that are outside the scope of this change:
+
+1. **Rate Limiting**: The question endpoints don't have rate limiting, which could allow abuse through excessive requests. This is a pre-existing issue across the entire API.
+
+2. **CSRF Protection**: The server doesn't implement CSRF protection for POST requests. This is a pre-existing architectural issue.
+
+These issues existed before this change and should be addressed separately as part of a broader security review.
+
 ## Debugging Tips
 
 If issues occur:
