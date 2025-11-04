@@ -2,6 +2,37 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 
+// Simple in-memory rate limiting for answer checking (per IP)
+const answerCheckRateLimit = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_CHECKS_PER_WINDOW = 100; // 100 checks per minute per IP
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const userLimit = answerCheckRateLimit.get(ip) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
+  
+  // Reset if window expired
+  if (now > userLimit.resetTime) {
+    userLimit.count = 0;
+    userLimit.resetTime = now + RATE_LIMIT_WINDOW;
+  }
+  
+  userLimit.count++;
+  answerCheckRateLimit.set(ip, userLimit);
+  
+  return userLimit.count <= MAX_CHECKS_PER_WINDOW;
+}
+
+// Cleanup old entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, limit] of answerCheckRateLimit.entries()) {
+    if (now > limit.resetTime + RATE_LIMIT_WINDOW) {
+      answerCheckRateLimit.delete(ip);
+    }
+  }
+}, 300000);
+
 /**
  * GET /api/questions
  * Query params: folder (optional, default: comp705-01)
@@ -48,6 +79,15 @@ router.get('/', async (req, res) => {
  */
 router.post('/check-answer', async (req, res) => {
   try {
+    // Rate limiting check
+    const clientIp = req.ip || req.connection.remoteAddress;
+    if (!checkRateLimit(clientIp)) {
+      return res.status(429).json({
+        success: false,
+        error: 'Rate limit exceeded. Please try again later.'
+      });
+    }
+    
     const { folder, questionIndex, selectedAnswer } = req.body;
     
     // Validate input
