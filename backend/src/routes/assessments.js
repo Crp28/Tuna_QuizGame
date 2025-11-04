@@ -171,6 +171,7 @@ router.post('/attempt', requireAuth, async (req, res) => {
       const correctOption = currentItem.options.find(opt => opt.optionId === correctOptionId);
       if (correctOption) {
         correctAnswerInfo = {
+          optionId: correctOption.optionId,
           label: correctOption.label,
           text: correctOption.text
         };

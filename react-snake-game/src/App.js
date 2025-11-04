@@ -900,6 +900,9 @@ function App() {
 
         // Commit snake
         snakeRef.current = newSnake;
+        
+        // Resume movement immediately - slow-mo will continue for visual effect
+        isVerifyingRef.current = false;
 
         // Next question
         if (result.nextItem) {
@@ -925,18 +928,29 @@ function App() {
           setAssessmentSession(null);
         }
 
-        // End slow-mo after delay
+        // End slow-mo after delay (movement already resumed above)
         setTimeout(() => {
           isSlowRef.current = false;
           setIsSlow(false);
-          isVerifyingRef.current = false;
         }, 2000);
 
       } else {
-        // Wrong answer - store correct answer and end game
+        // Wrong answer - find the correct worm by optionId to get label and color
         isVerifyingRef.current = false;
         if (result.correctAnswer) {
-          setLastCorrectAnswer(result.correctAnswer);
+          // Find the worm that has the correct optionId
+          const correctWorm = wormsRef.current.find(w => w.optionId === result.correctAnswer.optionId);
+          
+          if (correctWorm) {
+            setLastCorrectAnswer({
+              label: correctWorm.label,
+              text: result.correctAnswer.text,
+              color: correctWorm.color
+            });
+          } else {
+            // Fallback to server's label if we can't find the worm
+            setLastCorrectAnswer(result.correctAnswer);
+          }
         }
         setAssessmentSession(null);
         endGame();
@@ -1554,12 +1568,14 @@ function App() {
                 {/* Show correct answer after death */}
                 {isGameOver && lastCorrectAnswer && (
                   <div style={{
-                    background: 'linear-gradient(135deg, rgba(129, 255, 129, 0.15) 0%, rgba(129, 255, 129, 0.05) 100%)',
-                    border: '2px solid #81ff81',
+                    background: lastCorrectAnswer.color 
+                      ? `linear-gradient(135deg, ${lastCorrectAnswer.color}30 0%, ${lastCorrectAnswer.color}10 100%)`
+                      : 'linear-gradient(135deg, rgba(129, 255, 129, 0.15) 0%, rgba(129, 255, 129, 0.05) 100%)',
+                    border: `2px solid ${lastCorrectAnswer.color || '#81ff81'}`,
                     borderRadius: '12px',
                     padding: '12px 20px',
                     marginBottom: '15px',
-                    boxShadow: '0 0 20px rgba(129, 255, 129, 0.3)',
+                    boxShadow: `0 0 20px ${lastCorrectAnswer.color ? lastCorrectAnswer.color + '50' : 'rgba(129, 255, 129, 0.3)'}`,
                     animation: 'pulse 2s ease-in-out infinite'
                   }}>
                     <div style={{ 
@@ -1573,8 +1589,8 @@ function App() {
                     <div style={{
                       fontSize: '1.3rem',
                       fontWeight: 'bold',
-                      color: '#81ff81',
-                      textShadow: '0 0 10px rgba(129, 255, 129, 0.5)'
+                      color: lastCorrectAnswer.color || '#81ff81',
+                      textShadow: `0 0 10px ${lastCorrectAnswer.color ? lastCorrectAnswer.color + '80' : 'rgba(129, 255, 129, 0.5)'}`
                     }}>
                       {lastCorrectAnswer.label}: {lastCorrectAnswer.text}
                     </div>

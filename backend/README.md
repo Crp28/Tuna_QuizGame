@@ -156,13 +156,14 @@ Response (wrong answer):
 {
   "correct": false,
   "correctAnswer": {
+    "optionId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
     "label": "A",
     "text": "A library"
   }
 }
 ```
 
-**Note:** When the answer is wrong, the `correctAnswer` field is included with the label and text of the correct option. When the assessment is complete (no more questions), `nextItem` is omitted from the response.
+**Note:** When the answer is wrong, the `correctAnswer` field is included with the optionId, label, and text of the correct option. The optionId allows the frontend to match it with the displayed worm to show the correct color. When the assessment is complete (no more questions), `nextItem` is omitted from the response.
 
 ### Get Leaderboard
 ```http
