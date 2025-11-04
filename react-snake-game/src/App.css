@@ -180,7 +180,7 @@ canvas {
 .splash {
   position: absolute;
   z-index: 3;
-  top: 50%;
+  top: 60%;
   left: 50%;
   transform: translate(-50%, -50%);
   width: 410px;
@@ -422,12 +422,16 @@ canvas {
 .login-form button:hover {
   background: #ffb300;
 }
+
 /* Pulse animation for correct answer display */
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(129, 255, 129, 0.3);
     transform: scale(1);
   }
+
   50% {
     box-shadow: 0 0 30px rgba(129, 255, 129, 0.5);
     transform: scale(1.02);
