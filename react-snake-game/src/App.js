@@ -39,6 +39,15 @@ const getWaterColor = () => {
   return `hsl(${h},${s}%,${l}%)`;
 };
 
+// Helper to get option text from answer letter (A, B, C, D)
+const getOptionTextForAnswer = (question, answerLetter) => {
+  const answerIndex = ['A', 'B', 'C', 'D'].indexOf(answerLetter);
+  if (answerIndex === -1 || !question.options || !question.options[answerIndex]) {
+    return '';
+  }
+  return question.options[answerIndex];
+};
+
 const getRandomQuestion = (questions, usedQuestions) => {
   if (!questions || questions.length === 0) {
     console.error('No questions available');
@@ -790,6 +799,9 @@ function App() {
     const isSame = (a, b) => (a.x === b.x && a.y === b.y);
 
     // One-tick move, returns false if died
+    // Note: This function is async because it needs to check answers with the backend.
+    // The API call should be fast (<100ms) and the game loop waits for it to complete
+    // before proceeding. This ensures correct game state even if there's a brief pause.
     const moveSnakeOnce = async () => {
       // Apply the next scheduled direction; keep moving in that direction
       const d = nextDirRef.current;
@@ -896,9 +908,10 @@ function App() {
           }
         } catch (error) {
           console.error('Error checking answer:', error);
-          // On error, treat as wrong answer
+          // On network error, treat as wrong answer to be safe
+          // Store the question but indicate it was a network error
           setLastWrongQuestion(currentQuestion);
-          setLastCorrectAnswer('Error');
+          setLastCorrectAnswer('Network error - please try again');
           endGame();
           return false;
         }
@@ -1508,8 +1521,8 @@ function App() {
                       <span style={{ fontSize: '1.5rem' }}>✅</span>
                       <span>
                         <strong>Correct Answer:</strong> {lastCorrectAnswer}
-                        {lastWrongQuestion.options && lastWrongQuestion.options[['A', 'B', 'C', 'D'].indexOf(lastCorrectAnswer)] && 
-                          ` - ${lastWrongQuestion.options[['A', 'B', 'C', 'D'].indexOf(lastCorrectAnswer)]}`}
+                        {getOptionTextForAnswer(lastWrongQuestion, lastCorrectAnswer) && 
+                          ` - ${getOptionTextForAnswer(lastWrongQuestion, lastCorrectAnswer)}`}
                       </span>
                     </div>
                   </div>
