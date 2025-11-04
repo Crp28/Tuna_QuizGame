@@ -42,7 +42,7 @@ const getWaterColor = () => {
 const getRandomQuestion = (questions, usedQuestions) => {
   if (!questions || questions.length === 0) {
     console.error('No questions available');
-    return { question: null, usedQuestions: [] };
+    return { question: null, questionIndex: null, usedQuestions: [] };
   }
   if (usedQuestions.length >= questions.length) {
     usedQuestions = [];
@@ -52,7 +52,7 @@ const getRandomQuestion = (questions, usedQuestions) => {
     idx = Math.floor(Math.random() * questions.length);
   } while (usedQuestions.includes(idx));
   usedQuestions.push(idx);
-  return { question: questions[idx], usedQuestions };
+  return { question: questions[idx], questionIndex: idx, usedQuestions };
 };
 
 const generateWormsForQuestion = (question, snake) => {
@@ -100,8 +100,8 @@ const generateWormsForQuestion = (question, snake) => {
     x: positions[i].x,
     y: positions[i].y,
     label,
-    isCorrect: question && question.answer ? label === question.answer : false,
     color: getColor()
+    // Note: isCorrect field removed - correctness checking now done server-side
   }));
 };
 
@@ -132,6 +132,7 @@ function App() {
   // UI snapshot state (not used for movement/drawing timing)
   const [worms, setWorms] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(null);
   const [isGameRunning, setIsGameRunning] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [level, setLevel] = useState(1);
@@ -143,6 +144,8 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [showNextLevel, setShowNextLevel] = useState(false);
   const [questionAnimationClass, setQuestionAnimationClass] = useState('fade-in');
+  const [lastWrongQuestion, setLastWrongQuestion] = useState(null);
+  const [lastCorrectAnswer, setLastCorrectAnswer] = useState(null);
 
   // Practice mode state
   const [isPracticeMode, setIsPracticeMode] = useState(false);
@@ -184,6 +187,7 @@ function App() {
   const isSlowRef = useRef(false);
   const levelRef = useRef(1);
   const usedQuestionsRef = useRef([]);
+  const currentQuestionIndexRef = useRef(null);
 
   // Preload tuna images and background
   useEffect(() => {
@@ -274,8 +278,10 @@ function App() {
   // Initialize first question
   useEffect(() => {
     if (questions.length > 0 && !currentQuestion) {
-      const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
+      const { question, questionIndex, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
       setCurrentQuestion(question);
+      setCurrentQuestionIndex(questionIndex);
+      currentQuestionIndexRef.current = questionIndex;
       usedQuestionsRef.current = newUsed;
       setUsedQuestions(newUsed);
 
@@ -791,7 +797,7 @@ function App() {
     const isSame = (a, b) => (a.x === b.x && a.y === b.y);
 
     // One-tick move, returns false if died
-    const moveSnakeOnce = () => {
+    const moveSnakeOnce = async () => {
       // Apply the next scheduled direction; keep moving in that direction
       const d = nextDirRef.current;
       directionRef.current = d;
@@ -806,75 +812,104 @@ function App() {
       const eatenIdx = (wormsRef.current || []).findIndex(w => w.x === head.x && w.y === head.y);
       if (eatenIdx !== -1) {
         const worm = wormsRef.current[eatenIdx];
-        if (worm.isCorrect) {
-          // Level up
-          levelRef.current = (levelRef.current || 1) + 1;
-          setLevel(levelRef.current);
+        
+        // Check answer with backend
+        try {
+          const response = await fetch('/api/questions/check-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              folder: currentBank,
+              questionIndex: currentQuestionIndexRef.current,
+              selectedAnswer: worm.label
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success && result.correct) {
+            // Level up
+            levelRef.current = (levelRef.current || 1) + 1;
+            setLevel(levelRef.current);
 
-          // Leaderboard (non practice)
-          if (!isPracticeMode && user) {
-            const newEntry = {
-              name: user.username,
-              level: levelRef.current,
-              time: startTimeRef.current ? ((Date.now() - startTimeRef.current) / 1000).toFixed(2) : 0,
-              folder: currentBank
-            };
-            setLeaderboard(prev => {
-              const idx = prev.findIndex(e => e.name === user.username);
-              const updated = idx !== -1 ? Object.assign([...prev], { [idx]: newEntry }) : [...prev, newEntry];
-              updated.sort((a, b) => b.level - a.level || a.time - b.time);
-              fetch('/api/leaderboard', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newEntry)
-              }).catch(err => console.error('Failed to save score:', err));
-              return updated;
-            });
-          }
-
-          // Next question + worms
-          const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
-          if (question) {
-            setCurrentQuestion(question);
-            usedQuestionsRef.current = newUsed;
-            setUsedQuestions(newUsed);
-
-            const newWorms = generateWormsForQuestion(question, newSnake);
-            wormsRef.current = newWorms;
-            setWorms(newWorms);
-          }
-
-          // Commit snake
-          snakeRef.current = newSnake;
-
-          // Slow-motion effect
-          isSlowRef.current = true;
-          setIsSlow(true);
-          setTimeout(() => {
-            isSlowRef.current = false;
-            setIsSlow(false);
-          }, 2000);
-
-          // Next level CTA
-          if (!isPracticeMode && usedQuestionsRef.current && usedQuestionsRef.current.length >= Math.ceil(questions.length / 2)) {
-            setShowNextLevel(true);
-          }
-
-          // Question animation
-          const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
-          setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
-
-          // After a successful move, promote pending turn (if valid vs new direction)
-          if (pendingDirRef.current) {
-            const pd = pendingDirRef.current;
-            if (!isOpposite(pd, directionRef.current) && !isSame(pd, directionRef.current)) {
-              nextDirRef.current = pd;
+            // Leaderboard (non practice)
+            if (!isPracticeMode && user) {
+              const newEntry = {
+                name: user.username,
+                level: levelRef.current,
+                time: startTimeRef.current ? ((Date.now() - startTimeRef.current) / 1000).toFixed(2) : 0,
+                folder: currentBank
+              };
+              setLeaderboard(prev => {
+                const idx = prev.findIndex(e => e.name === user.username);
+                const updated = idx !== -1 ? Object.assign([...prev], { [idx]: newEntry }) : [...prev, newEntry];
+                updated.sort((a, b) => b.level - a.level || a.time - b.time);
+                fetch('/api/leaderboard', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(newEntry)
+                }).catch(err => console.error('Failed to save score:', err));
+                return updated;
+              });
             }
-            pendingDirRef.current = null;
-          }
 
-          return true;
-        } else {
+            // Next question + worms
+            const { question, questionIndex, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
+            if (question) {
+              setCurrentQuestion(question);
+              setCurrentQuestionIndex(questionIndex);
+              currentQuestionIndexRef.current = questionIndex;
+              usedQuestionsRef.current = newUsed;
+              setUsedQuestions(newUsed);
+
+              const newWorms = generateWormsForQuestion(question, newSnake);
+              wormsRef.current = newWorms;
+              setWorms(newWorms);
+            }
+
+            // Commit snake
+            snakeRef.current = newSnake;
+
+            // Slow-motion effect
+            isSlowRef.current = true;
+            setIsSlow(true);
+            setTimeout(() => {
+              isSlowRef.current = false;
+              setIsSlow(false);
+            }, 2000);
+
+            // Next level CTA
+            if (!isPracticeMode && usedQuestionsRef.current && usedQuestionsRef.current.length >= Math.ceil(questions.length / 2)) {
+              setShowNextLevel(true);
+            }
+
+            // Question animation
+            const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
+            setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
+
+            // After a successful move, promote pending turn (if valid vs new direction)
+            if (pendingDirRef.current) {
+              const pd = pendingDirRef.current;
+              if (!isOpposite(pd, directionRef.current) && !isSame(pd, directionRef.current)) {
+                nextDirRef.current = pd;
+              }
+              pendingDirRef.current = null;
+            }
+
+            return true;
+          } else {
+            // Wrong answer - store it for display in splash
+            setLastWrongQuestion(currentQuestion);
+            setLastCorrectAnswer(result.correctAnswer || 'Unknown');
+            endGame();
+            return false;
+          }
+        } catch (error) {
+          console.error('Error checking answer:', error);
+          // On error, treat as wrong answer
+          setLastWrongQuestion(currentQuestion);
+          setLastCorrectAnswer('Error');
           endGame();
           return false;
         }
@@ -907,7 +942,7 @@ function App() {
       return false;
     };
 
-    const gameLogicLoop = () => {
+    const gameLogicLoop = async () => {
       const now = Date.now();
       if (!lastStepTimeRef.current) lastStepTimeRef.current = now;
 
@@ -930,7 +965,17 @@ function App() {
       }
 
       while (now - lastStepTimeRef.current >= stepDelay) {
-        if (!moveSnakeOnce()) return;
+        // If this is the first move, clear the awaitingInitialMove flag after executing it
+        const wasAwaitingInitialMove = awaitingInitialMoveRef.current;
+        
+        const moveResult = await moveSnakeOnce();
+        
+        if (wasAwaitingInitialMove) {
+          awaitingInitialMoveRef.current = false;
+          setAwaitingInitialMove(false);
+        }
+        
+        if (!moveResult) return;
         if (checkCollision()) {
           endGame();
           return;
@@ -992,14 +1037,18 @@ function App() {
     setShowSplash(false);
     setShowNextLevel(false);
     setShowPracticeModePopup(false); // Close practice mode popup if open
+    setLastWrongQuestion(null); // Reset last wrong question
+    setLastCorrectAnswer(null); // Reset last correct answer
 
-    const { question, usedQuestions: newUsed } = getRandomQuestion(questions, []);
+    const { question, questionIndex, usedQuestions: newUsed } = getRandomQuestion(questions, []);
     if (!question) {
       console.error('Could not get a valid question');
       return;
     }
 
     setCurrentQuestion(question);
+    setCurrentQuestionIndex(questionIndex);
+    currentQuestionIndexRef.current = questionIndex;
     usedQuestionsRef.current = newUsed;
     setUsedQuestions(newUsed);
 
@@ -1069,15 +1118,19 @@ function App() {
       if (awaitingInitialMoveRef.current) {
         if (!isOpposite(newDir, eff)) {
           nextDirRef.current = newDir;
-          awaitingInitialMoveRef.current = false;
-          setAwaitingInitialMove(false);
+          // Don't set awaitingInitialMoveRef to false here!
+          // It will be set to false after the first move executes in gameLogicLoop
           const now = Date.now();
           startTimeRef.current = now;
           setStartTime(now);
           lastStepTimeRef.current = now;
           directionRef.current = newDir; // visual orientation
           setLastMoveTime(now);
+          // Clear any pending direction to prevent suicide from multiple quick inputs
+          pendingDirRef.current = null;
         }
+        // IMPORTANT: Return here regardless of whether input was valid or not
+        // This ensures we ignore ALL inputs until the first move actually executes
         return;
       }
 
@@ -1426,6 +1479,61 @@ function App() {
                 <div style={{ fontSize: '2.1rem', fontWeight: '600', marginBottom: '12px' }}>
                   {isGameOver ? `${t.splashPlayAgain} ${user.name}?` : `${t.splashReady} ${user.name}?`}
                 </div>
+                
+                {/* Show the question and correct answer if player died from wrong answer */}
+                {isGameOver && lastWrongQuestion && lastCorrectAnswer && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(255, 87, 34, 0.15) 0%, rgba(244, 67, 54, 0.15) 100%)',
+                    border: '2px solid rgba(255, 87, 34, 0.5)',
+                    borderRadius: '16px',
+                    padding: '20px',
+                    marginBottom: '20px',
+                    boxShadow: '0 4px 20px rgba(255, 87, 34, 0.3)',
+                  }}>
+                    <div style={{
+                      fontSize: '1.4rem',
+                      fontWeight: '700',
+                      marginBottom: '12px',
+                      color: '#ff5722',
+                      textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                    }}>
+                      💀 You Got This Wrong:
+                    </div>
+                    <div style={{
+                      fontSize: '1.1rem',
+                      marginBottom: '15px',
+                      color: '#fff',
+                      lineHeight: '1.5',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      borderLeft: '4px solid #ff5722'
+                    }}>
+                      <strong>Q:</strong> {lastWrongQuestion.question}
+                    </div>
+                    <div style={{
+                      fontSize: '1.15rem',
+                      fontWeight: '600',
+                      padding: '12px',
+                      background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.3) 0%, rgba(139, 195, 74, 0.3) 100%)',
+                      borderRadius: '10px',
+                      color: '#81ff81',
+                      textShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                      border: '2px solid rgba(129, 255, 129, 0.5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <span style={{ fontSize: '1.5rem' }}>✅</span>
+                      <span>
+                        <strong>Correct Answer:</strong> {lastCorrectAnswer}
+                        {lastWrongQuestion.options && lastWrongQuestion.options[['A', 'B', 'C', 'D'].indexOf(lastCorrectAnswer)] && 
+                          ` - ${lastWrongQuestion.options[['A', 'B', 'C', 'D'].indexOf(lastCorrectAnswer)]}`}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
                 <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>
                   {t.splashStartPrompt}
                 </div>
