@@ -6,7 +6,7 @@ import LoginPage from './LoginPage';
 import UserPanel from './UserPanel';
 import QuestionBankSelector from './QuestionBankSelector';
 import PracticeModePopup from './PracticeModePopup';
-import { startAssessment, submitAttempt, retryWithBackoff } from './api';
+import { startAssessment, submitAttempt, revealCorrectAnswer, retryWithBackoff } from './api';
 
 const GRID_SIZE = 24;
 const CANVAS_WIDTH = 900;
@@ -845,6 +845,37 @@ function App() {
     return strugglingCount >= 2;
   };
 
+  // Handle border/self collision (fetch correct answer from server)
+  const handleBorderSelfCollision = useCallback(async () => {
+    // If we have an active assessment session, fetch the correct answer
+    if (assessmentSession && currentQuestion) {
+      try {
+        const result = await retryWithBackoff(async () => {
+          return await revealCorrectAnswer(
+            assessmentSession.itemId,
+            assessmentSession.seq
+          );
+        });
+
+        if (result.correctAnswer) {
+          setLastCorrectAnswer({
+            question: currentQuestion.question,
+            label: null, // Always no label for border/self collision
+            text: result.correctAnswer.text,
+            color: null // Always white glow
+          });
+        }
+        setAssessmentSession(null);
+      } catch (error) {
+        console.error('Failed to fetch correct answer:', error);
+        setAssessmentSession(null);
+      }
+    }
+    
+    // Call the regular endGame
+    endGame();
+  }, [assessmentSession, currentQuestion, endGame]);
+
   // Handle collision in assessed mode (async server validation)
   const handleAssessedModeCollision = useCallback(async (worm, newSnake) => {
     if (!assessmentSession || !worm.optionId) {
@@ -1050,7 +1081,7 @@ function App() {
       while (now - lastStepTimeRef.current >= stepDelay) {
         if (!moveSnakeOnce()) return;
         if (checkCollision()) {
-          endGame();
+          handleBorderSelfCollision();
           return;
         }
         lastStepTimeRef.current += stepDelay;
@@ -1072,7 +1103,7 @@ function App() {
       clearInterval(logicIntervalId);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [isGameRunning, isPracticeMode, drawGame, endGame, handleAssessedModeCollision, user, currentBank]);
+  }, [isGameRunning, isPracticeMode, drawGame, endGame, handleAssessedModeCollision, handleBorderSelfCollision, user, currentBank]);
 
   const startGame = useCallback(async () => {
     // Always use assessed mode with server-authoritative validation

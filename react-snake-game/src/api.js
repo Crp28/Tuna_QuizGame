@@ -54,6 +54,30 @@ export async function submitAttempt(itemId, optionId, seq) {
 }
 
 /**
+ * Get the correct answer for the current question (used when game ends without selecting an answer)
+ * @param {string} itemId - The question item ID
+ * @param {number} seq - The sequence number
+ * @returns {Promise<{correctAnswer: {optionId, label, text}}>}
+ */
+export async function revealCorrectAnswer(itemId, seq) {
+  const response = await fetch(`${API_BASE}/api/assessments/reveal`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ itemId, seq })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to reveal correct answer');
+  }
+  
+  return response.json();
+}
+
+/**
  * Retry wrapper with exponential backoff
  * @param {Function} fn - The async function to retry
  * @param {number} maxRetries - Maximum number of retries
