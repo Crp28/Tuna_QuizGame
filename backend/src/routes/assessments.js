@@ -217,4 +217,81 @@ router.post('/attempt', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/assessments/reveal
+ * Get the correct answer for the current question when game ends (border/self collision)
+ * Body: { itemId, seq }
+ * Returns: { correctAnswer: { optionId, label, text } }
+ */
+router.post('/reveal', requireAuth, async (req, res) => {
+  try {
+    const { itemId, seq } = req.body;
+    
+    // Validation
+    if (!itemId || typeof seq !== 'number' || seq < 0 || !Number.isInteger(seq)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'itemId and seq are required, and seq must be a non-negative integer' 
+      });
+    }
+    
+    // Check if assessment session exists
+    if (!req.session.assessment) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No active assessment session' 
+      });
+    }
+    
+    const assessment = req.session.assessment;
+    
+    // Validate sequence number
+    if (seq !== assessment.seq) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid sequence number' 
+      });
+    }
+    
+    // Validate itemId
+    const currentItem = assessment.queue[assessment.index];
+    if (!currentItem || currentItem.itemId !== itemId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid item ID' 
+      });
+    }
+    
+    // Get correct option
+    const correctOptionId = assessment.mapping[itemId];
+    const correctOption = currentItem.options.find(opt => opt.optionId === correctOptionId);
+    
+    if (!correctOption) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to find correct answer' 
+      });
+    }
+    
+    // Clear assessment session since game is over
+    delete req.session.assessment;
+    
+    // Return correct answer
+    res.json({
+      correctAnswer: {
+        optionId: correctOption.optionId,
+        label: correctOption.label,
+        text: correctOption.text
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error revealing answer:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to reveal answer' 
+    });
+  }
+});
+
 module.exports = router;
