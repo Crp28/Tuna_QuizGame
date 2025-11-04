@@ -132,15 +132,10 @@ function App() {
   // UI snapshot state (not used for movement/drawing timing)
   const [worms, setWorms] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(null);
   const [isGameRunning, setIsGameRunning] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [level, setLevel] = useState(1);
-  const [usedQuestions, setUsedQuestions] = useState([]);
-  const [startTime, setStartTime] = useState(null);
   const [gameTime, setGameTime] = useState(0);
-  const [awaitingInitialMove, setAwaitingInitialMove] = useState(true);
-  const [isSlow, setIsSlow] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [showNextLevel, setShowNextLevel] = useState(false);
   const [questionAnimationClass, setQuestionAnimationClass] = useState('fade-in');
@@ -280,10 +275,8 @@ function App() {
     if (questions.length > 0 && !currentQuestion) {
       const { question, questionIndex, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
       setCurrentQuestion(question);
-      setCurrentQuestionIndex(questionIndex);
       currentQuestionIndexRef.current = questionIndex;
       usedQuestionsRef.current = newUsed;
-      setUsedQuestions(newUsed);
 
       const newWorms = generateWormsForQuestion(question, snakeRef.current);
       wormsRef.current = newWorms;
@@ -858,10 +851,8 @@ function App() {
             const { question, questionIndex, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
             if (question) {
               setCurrentQuestion(question);
-              setCurrentQuestionIndex(questionIndex);
               currentQuestionIndexRef.current = questionIndex;
               usedQuestionsRef.current = newUsed;
-              setUsedQuestions(newUsed);
 
               const newWorms = generateWormsForQuestion(question, newSnake);
               wormsRef.current = newWorms;
@@ -873,10 +864,8 @@ function App() {
 
             // Slow-motion effect
             isSlowRef.current = true;
-            setIsSlow(true);
             setTimeout(() => {
               isSlowRef.current = false;
-              setIsSlow(false);
             }, 2000);
 
             // Next level CTA
@@ -972,7 +961,6 @@ function App() {
         
         if (wasAwaitingInitialMove) {
           awaitingInitialMoveRef.current = false;
-          setAwaitingInitialMove(false);
         }
         
         if (!moveResult) return;
@@ -999,7 +987,7 @@ function App() {
       clearInterval(logicIntervalId);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [isGameRunning, isPracticeMode, drawGame, endGame, questions]);
+  }, [isGameRunning, isPracticeMode, drawGame, endGame, questions, currentBank, user, currentQuestion]);
 
   const startGame = useCallback(() => {
     if (!questions || questions.length === 0) {
@@ -1028,12 +1016,9 @@ function App() {
     // UI state
     setIsGameOver(false);
     setLevel(1);
-    setUsedQuestions([]);
-    setStartTime(null);
     setCurrentGameStart(Date.now());
     setLastMoveTime(null);
     lastStepTimeRef.current = 0;
-    setAwaitingInitialMove(true);
     setShowSplash(false);
     setShowNextLevel(false);
     setShowPracticeModePopup(false); // Close practice mode popup if open
@@ -1047,10 +1032,8 @@ function App() {
     }
 
     setCurrentQuestion(question);
-    setCurrentQuestionIndex(questionIndex);
     currentQuestionIndexRef.current = questionIndex;
     usedQuestionsRef.current = newUsed;
-    setUsedQuestions(newUsed);
 
     const newWorms = generateWormsForQuestion(question, initialSnake);
     wormsRef.current = newWorms;
@@ -1122,7 +1105,6 @@ function App() {
           // It will be set to false after the first move executes in gameLogicLoop
           const now = Date.now();
           startTimeRef.current = now;
-          setStartTime(now);
           lastStepTimeRef.current = now;
           directionRef.current = newDir; // visual orientation
           setLastMoveTime(now);
@@ -1181,7 +1163,6 @@ function App() {
       setIsGameOver(false);
       setShowSplash(true);
       usedQuestionsRef.current = [];
-      setUsedQuestions([]);
     }
   };
 
