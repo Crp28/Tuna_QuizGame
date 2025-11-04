@@ -853,9 +853,6 @@ function App() {
       return;
     }
 
-    // Save current worms for later reference (in case we need to find the correct one)
-    const currentWorms = [...wormsRef.current];
-
     // Trigger slow-mo effect immediately to hide RTT
     isSlowRef.current = true;
     setIsSlow(true);
@@ -938,28 +935,15 @@ function App() {
         }, 2000);
 
       } else {
-        // Wrong answer - find the correct worm from saved array
+        // Wrong answer - always use white glow fallback (no label/color matching)
         isVerifyingRef.current = false;
         if (result.correctAnswer) {
-          // Find the worm that has the correct optionId from the saved worms array
-          const correctWorm = currentWorms.find(w => w.optionId === result.correctAnswer.optionId);
-          
-          if (correctWorm) {
-            setLastCorrectAnswer({
-              question: currentQuestion.question,
-              label: correctWorm.label,
-              text: result.correctAnswer.text,
-              color: correctWorm.color
-            });
-          } else {
-            // Fallback: remove label and use white glow
-            setLastCorrectAnswer({
-              question: currentQuestion.question,
-              label: null, // No label
-              text: result.correctAnswer.text,
-              color: null // Will use white glow
-            });
-          }
+          setLastCorrectAnswer({
+            question: currentQuestion.question,
+            label: null, // Always no label
+            text: result.correctAnswer.text,
+            color: null // Always white glow
+          });
         }
         setAssessmentSession(null);
         endGame();
