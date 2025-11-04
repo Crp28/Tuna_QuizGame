@@ -135,10 +135,14 @@ function App() {
   const [isGameRunning, setIsGameRunning] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [level, setLevel] = useState(1);
+  // eslint-disable-next-line no-unused-vars
   const [usedQuestions, setUsedQuestions] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [startTime, setStartTime] = useState(null);
   const [gameTime, setGameTime] = useState(0);
+  // eslint-disable-next-line no-unused-vars
   const [awaitingInitialMove, setAwaitingInitialMove] = useState(true);
+  // eslint-disable-next-line no-unused-vars
   const [isSlow, setIsSlow] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [showNextLevel, setShowNextLevel] = useState(false);
@@ -185,6 +189,7 @@ function App() {
   const levelRef = useRef(1);
   const usedQuestionsRef = useRef([]);
   const currentQuestionRef = useRef(null); // Keep track of current question for verification
+  const isGameRunningRef = useRef(false); // Keep track of game state for async verification
 
   // Preload tuna images and background
   useEffect(() => {
@@ -722,6 +727,7 @@ function App() {
   const endGame = useCallback(() => {
     setIsGameRunning(false);
     setIsGameOver(true);
+    isGameRunningRef.current = false; // Reset ref
 
     // Trigger explosion animation
     isExplodingRef.current = true;
@@ -816,6 +822,9 @@ function App() {
   // Main game loop with tempo-safe two-stage input buffer
   useEffect(() => {
     if (!isGameRunning) return;
+    
+    // Update ref for async callbacks
+    isGameRunningRef.current = true;
 
     const isOpposite = (a, b) => (a.x + b.x === 0 && a.y + b.y === 0);
     const isSame = (a, b) => (a.x === b.x && a.y === b.y);
@@ -841,7 +850,7 @@ function App() {
         // If the answer is incorrect, the game will end when the verification completes
         if (currentQuestionRef.current) {
           verifyAnswer(currentQuestionRef.current.question, worm.label).then(isCorrect => {
-            if (!isCorrect && isGameRunning) {
+            if (!isCorrect && isGameRunningRef.current) {
               // Answer was incorrect - end the game immediately
               endGame();
             }
@@ -992,6 +1001,7 @@ function App() {
     return () => {
       clearInterval(logicIntervalId);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+      isGameRunningRef.current = false; // Reset ref on cleanup
     };
   }, [isGameRunning, isPracticeMode, drawGame, endGame, questions, verifyAnswer, user, currentBank]);
 
