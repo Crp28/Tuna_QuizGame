@@ -228,10 +228,10 @@ router.post('/reveal', requireAuth, async (req, res) => {
     const { itemId, seq } = req.body;
     
     // Validation
-    if (!itemId || typeof seq !== 'number') {
+    if (!itemId || typeof seq !== 'number' || seq < 0 || !Number.isInteger(seq)) {
       return res.status(400).json({ 
         success: false, 
-        error: 'itemId and seq are required' 
+        error: 'itemId and seq are required, and seq must be a non-negative integer' 
       });
     }
     

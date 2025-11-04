@@ -846,34 +846,36 @@ function App() {
   };
 
   // Handle border/self collision (fetch correct answer from server)
-  const handleBorderSelfCollision = useCallback(async () => {
-    // If we have an active assessment session, fetch the correct answer
-    if (assessmentSession && currentQuestion) {
-      try {
-        const result = await retryWithBackoff(async () => {
-          return await revealCorrectAnswer(
-            assessmentSession.itemId,
-            assessmentSession.seq
-          );
-        });
-
-        if (result.correctAnswer) {
-          setLastCorrectAnswer({
-            question: currentQuestion.question,
-            label: null, // Always no label for border/self collision
-            text: result.correctAnswer.text,
-            color: null // Always white glow
-          });
-        }
-        setAssessmentSession(null);
-      } catch (error) {
-        console.error('Failed to fetch correct answer:', error);
-        setAssessmentSession(null);
-      }
-    }
-    
-    // Call the regular endGame
+  const handleBorderSelfCollision = useCallback(() => {
+    // End the game immediately
     endGame();
+    
+    // If we have an active assessment session, fetch the correct answer in background
+    if (assessmentSession && currentQuestion) {
+      (async () => {
+        try {
+          const result = await retryWithBackoff(async () => {
+            return await revealCorrectAnswer(
+              assessmentSession.itemId,
+              assessmentSession.seq
+            );
+          });
+
+          if (result.correctAnswer) {
+            setLastCorrectAnswer({
+              question: currentQuestion.question,
+              label: null, // Always no label for border/self collision
+              text: result.correctAnswer.text,
+              color: null // Always white glow
+            });
+          }
+          setAssessmentSession(null);
+        } catch (error) {
+          console.error('Failed to fetch correct answer:', error);
+          setAssessmentSession(null);
+        }
+      })();
+    }
   }, [assessmentSession, currentQuestion, endGame]);
 
   // Handle collision in assessed mode (async server validation)
