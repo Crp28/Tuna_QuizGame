@@ -19,8 +19,9 @@ const requireAuth = (req, res, next) => {
  * GET /api/questions
  * Query params: folder (optional, default: comp705-01)
  * Returns: Array of questions WITHOUT answer field (security improvement)
+ * Requires authentication to prevent unauthorized access
  */
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const folder = req.query.folder || 'comp705-01';
     

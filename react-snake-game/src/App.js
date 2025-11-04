@@ -135,6 +135,9 @@ function App() {
   const [isGameRunning, setIsGameRunning] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [level, setLevel] = useState(1);
+  
+  // These state variables are used via setters to trigger re-renders
+  // The actual values are read from refs for performance in game loop
   // eslint-disable-next-line no-unused-vars
   const [usedQuestions, setUsedQuestions] = useState([]);
   // eslint-disable-next-line no-unused-vars
@@ -144,6 +147,7 @@ function App() {
   const [awaitingInitialMove, setAwaitingInitialMove] = useState(true);
   // eslint-disable-next-line no-unused-vars
   const [isSlow, setIsSlow] = useState(false);
+  
   const [showSplash, setShowSplash] = useState(true);
   const [showNextLevel, setShowNextLevel] = useState(false);
   const [questionAnimationClass, setQuestionAnimationClass] = useState('fade-in');
@@ -848,6 +852,8 @@ function App() {
         
         // Verify answer with backend - the game continues optimistically
         // If the answer is incorrect, the game will end when the verification completes
+        // Note: Multiple verifications can be in-flight if player eats crabs quickly.
+        // This is intentional - the game will end as soon as ANY incorrect answer is detected.
         if (currentQuestionRef.current) {
           verifyAnswer(currentQuestionRef.current.question, worm.label).then(isCorrect => {
             if (!isCorrect && isGameRunningRef.current) {
