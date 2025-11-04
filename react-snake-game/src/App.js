@@ -335,6 +335,11 @@ function App() {
 
   // Initialize first question
   useEffect(() => {
+    // Skip if in assessed mode - worms are managed by assessment flow
+    if (assessmentSession) {
+      return;
+    }
+    
     if (questions.length > 0 && !currentQuestion) {
       const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
       setCurrentQuestion(question);
@@ -348,7 +353,7 @@ function App() {
       const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
       setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
     }
-  }, [questions, currentQuestion]);
+  }, [questions, currentQuestion, assessmentSession]);
 
   // Water splash explosion animation loop - Maori ocean theme
   const explosionLoop = useCallback(() => {
@@ -893,6 +898,14 @@ function App() {
     // Mark that we're verifying
     isVerifyingRef.current = true;
     setAssessmentSession(prev => ({ ...prev, isVerifying: true }));
+    
+    // Debug: Log what we're submitting
+    console.log('Submitting answer:', { 
+      itemId: assessmentSession.itemId, 
+      optionId: worm.optionId, 
+      label: worm.label,
+      seq: assessmentSession.seq 
+    });
 
     try {
       // Call server with retry
@@ -953,6 +966,9 @@ function App() {
           const newWorms = generateWormsForAssessment(result.nextItem.options, newSnake);
           wormsRef.current = newWorms;
           setWorms(newWorms);
+          
+          // Debug: Log worm optionIds for verification
+          console.log('New worms generated after correct answer:', newWorms.map(w => ({ label: w.label, optionId: w.optionId })));
 
           const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
           setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
@@ -1161,6 +1177,9 @@ function App() {
         const newWorms = generateWormsForAssessment(data.options, initialSnake);
         wormsRef.current = newWorms;
         setWorms(newWorms);
+        
+        // Debug: Log initial worm optionIds
+        console.log('Initial worms generated at game start:', newWorms.map(w => ({ label: w.label, optionId: w.optionId })));
 
         const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
         setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
