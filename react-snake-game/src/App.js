@@ -1026,6 +1026,15 @@ function App() {
           return true; // Keep game running but paused
         }
         
+        // Clear awaiting initial move flag if this is the first move
+        if (awaitingInitialMoveRef.current) {
+          awaitingInitialMoveRef.current = false;
+          setAwaitingInitialMove(false);
+        }
+        
+        // Set verification flag BEFORE async call to prevent duplicate collision detection
+        isVerifyingRef.current = true;
+        
         // Trigger async validation
         handleAssessedModeCollision(worm, newSnake);
         return true; // Game continues, validation happens async
@@ -1033,6 +1042,12 @@ function App() {
         // Move forward (pop tail)
         newSnake.pop();
         snakeRef.current = newSnake;
+
+        // Clear awaiting initial move flag after first successful move
+        if (awaitingInitialMoveRef.current) {
+          awaitingInitialMoveRef.current = false;
+          setAwaitingInitialMove(false);
+        }
 
         // After a successful move, promote pending turn (if valid vs new direction)
         if (pendingDirRef.current) {
@@ -1231,17 +1246,19 @@ function App() {
 
       // First valid input: start rhythm from this press (snake.js)
       if (awaitingInitialMoveRef.current) {
-        if (!isOpposite(newDir, eff)) {
-          nextDirRef.current = newDir;
-          awaitingInitialMoveRef.current = false;
-          setAwaitingInitialMove(false);
-          const now = Date.now();
-          startTimeRef.current = now;
-          setStartTime(now);
-          lastStepTimeRef.current = now;
-          directionRef.current = newDir; // visual orientation
-          setLastMoveTime(now);
+        // Only accept input if we haven't already set a direction
+        if (nextDirRef.current.x === 0 && nextDirRef.current.y === 0) {
+          if (!isOpposite(newDir, eff)) {
+            nextDirRef.current = newDir;
+            const now = Date.now();
+            startTimeRef.current = now;
+            setStartTime(now);
+            lastStepTimeRef.current = now;
+            directionRef.current = newDir; // visual orientation
+            setLastMoveTime(now);
+          }
         }
+        // Always return to block all inputs until first move completes
         return;
       }
 
