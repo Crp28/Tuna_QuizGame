@@ -831,6 +831,9 @@ function App() {
       if (eatenIdx !== -1) {
         const worm = wormsRef.current[eatenIdx];
         
+        // Remove the eaten worm immediately to prevent re-processing
+        wormsRef.current = wormsRef.current.filter((_, i) => i !== eatenIdx);
+        
         // Check answer with backend
         try {
           const response = await fetch('/api/questions/check-answer', {
