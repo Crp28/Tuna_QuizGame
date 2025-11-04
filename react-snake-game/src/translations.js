@@ -121,9 +121,9 @@ const translations = {
     practiceModeMessage1: "We noticed you're having some challenges! 🎮",
     practiceModeMessage2: "Would you like to try Practice Mode?",
     practiceModeFeatures: "In Practice Mode:",
-    practiceFeatureSlower: "🐢 The snake moves slower, giving you more time to react",
+    practiceFeatureSlower: "🔻 The tuna moves slower, giving you more time to react",
     practiceFeatureNoScore: "📊 Your scores won't be recorded on the leaderboard",
-    practiceFeatureNoUnlock: "🔒 Levels won't unlock, but you can practice and improve",
+    practiceFeatureNoUnlock: "🔒 You can practice and improve until you are ready",
     practiceModeAccept: "Try Practice Mode",
     practiceModeDecline: "Continue Normal Mode",
     practiceModeIndicator: "🎯 PRACTICE MODE",
@@ -131,7 +131,7 @@ const translations = {
     practiceDontShowAgain: "Don't show this again",
 
     // Footer
-    footerMadeBy: "Made by Minh Nguyen @",
+    footerMadeBy: "Made by Yuchen Bao & Minh Nguyen @AUT",
     footerAdmin: "Admin: Edit Question Bank",
 
     // Language switcher
@@ -259,7 +259,7 @@ const translations = {
     practiceModeMessage1: "I kite mātou kei te whai wero koe! 🎮",
     practiceModeMessage2: "E hiahia ana koe ki te whakamātau i te Aratau Whakaako?",
     practiceModeFeatures: "I roto i te Aratau Whakaako:",
-    practiceFeatureSlower: "🐢 Ka nuku pōturi ake te tuna, ka tuku atu i te wā ki a koe",
+    practiceFeatureSlower: "🔻 Ka nuku pōturi ake te tuna, ka tuku atu i te wā ki a koe",
     practiceFeatureNoScore: "📊 Kāore ō piro e tuhia ki te papa tākaro",
     practiceFeatureNoUnlock: "🔒 Kāore ngā taumata e whakatuwhera, engari ka taea e koe te whakaako",
     practiceModeAccept: "Whakamātau Aratau Whakaako",
