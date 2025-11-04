@@ -150,6 +150,7 @@ function App() {
   const [questionAnimationClass, setQuestionAnimationClass] = useState('fade-in');
   const [lastWrongQuestion, setLastWrongQuestion] = useState(null);
   const [lastCorrectAnswer, setLastCorrectAnswer] = useState(null);
+  const [lastCorrectAnswerColor, setLastCorrectAnswerColor] = useState(null);
 
   // Practice mode state
   const [isPracticeMode, setIsPracticeMode] = useState(false);
@@ -279,7 +280,7 @@ function App() {
     loadLeaderboard();
   }, [user, currentBank]);
 
-  // Initialize first question
+  // Initialize first question (only runs when questions are first loaded)
   useEffect(() => {
     if (questions.length > 0 && !currentQuestion) {
       const { question, questionIndex, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
@@ -294,7 +295,8 @@ function App() {
       const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
       setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
     }
-  }, [questions, currentQuestion]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions]); // Only depend on questions to avoid re-running when currentQuestion changes
 
   // Water splash explosion animation loop - Maori ocean theme
   const explosionLoop = useCallback(() => {
@@ -915,6 +917,11 @@ function App() {
             // Wrong answer - store it for display in splash
             setLastWrongQuestion(currentQuestion);
             setLastCorrectAnswer(result.correctAnswer || 'Unknown');
+            // Find the correct answer's worm color
+            const correctWorm = wormsRef.current.find(w => w.label === result.correctAnswer);
+            if (correctWorm) {
+              setLastCorrectAnswerColor(correctWorm.color);
+            }
             endGame();
             return false;
           }
@@ -1010,6 +1017,11 @@ function App() {
               .then(result => {
                 if (result.correctAnswer) {
                   setLastCorrectAnswer(result.correctAnswer);
+                  // Find the correct answer's worm color
+                  const correctWorm = wormsRef.current.find(w => w.label === result.correctAnswer);
+                  if (correctWorm) {
+                    setLastCorrectAnswerColor(correctWorm.color);
+                  }
                 }
               })
               .catch(err => console.error('Failed to fetch correct answer:', err));
@@ -1074,6 +1086,7 @@ function App() {
     setShowPracticeModePopup(false); // Close practice mode popup if open
     setLastWrongQuestion(null); // Reset last wrong question
     setLastCorrectAnswer(null); // Reset last correct answer
+    setLastCorrectAnswerColor(null); // Reset last correct answer color
 
     const { question, questionIndex, usedQuestions: newUsed } = getRandomQuestion(questions, []);
     if (!question) {
@@ -1515,37 +1528,57 @@ function App() {
                 </div>
                 
                 {/* Show the question and correct answer on death */}
-                {isGameOver && lastWrongQuestion && lastCorrectAnswer && (
-                  <div style={{
-                    background: 'rgba(30, 41, 59, 0.95)',
-                    border: '3px solid #ec4899',
-                    borderRadius: '12px',
-                    padding: '20px 24px',
-                    marginBottom: '20px',
-                    boxShadow: `0 0 30px rgba(236, 72, 153, 0.6), 0 0 60px rgba(236, 72, 153, 0.3)`,
-                    maxWidth: '90%'
-                  }}>
+                {isGameOver && lastWrongQuestion && lastCorrectAnswer && (() => {
+                  // Use stored color or fallback to pink
+                  const answerColor = lastCorrectAnswerColor || '#ec4899';
+                  // Convert hex/hsl to rgba for box-shadow
+                  const getRgbaFromColor = (color) => {
+                    if (color.startsWith('hsl')) {
+                      // For hsl colors, we'll parse and convert - but for simplicity, extract the hue
+                      const match = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+                      if (match) {
+                        const [, h, s, l] = match.map(Number);
+                        // Approximate conversion for glow effect
+                        return `hsla(${h}, ${s}%, ${l}%, 0.6)`;
+                      }
+                    }
+                    // Default fallback
+                    return 'rgba(236, 72, 153, 0.6)';
+                  };
+                  const glowColor = getRgbaFromColor(answerColor);
+                  
+                  return (
                     <div style={{
-                      fontSize: '0.9rem',
-                      marginBottom: '12px',
-                      color: '#e2e8f0',
-                      lineHeight: '1.4',
-                      textAlign: 'center'
+                      background: 'rgba(30, 41, 59, 0.95)',
+                      border: `3px solid ${answerColor}`,
+                      borderRadius: '12px',
+                      padding: '20px 24px',
+                      marginBottom: '20px',
+                      boxShadow: `0 0 30px ${glowColor}, 0 0 60px ${glowColor.replace('0.6', '0.3')}`,
+                      maxWidth: '90%'
                     }}>
-                      {lastWrongQuestion.question}
+                      <div style={{
+                        fontSize: '0.9rem',
+                        marginBottom: '12px',
+                        color: '#e2e8f0',
+                        lineHeight: '1.4',
+                        textAlign: 'center'
+                      }}>
+                        {lastWrongQuestion.question}
+                      </div>
+                      <div style={{
+                        fontSize: '1.6rem',
+                        fontWeight: '700',
+                        textAlign: 'center',
+                        color: answerColor,
+                        textShadow: `0 0 20px ${glowColor}, 0 0 40px ${glowColor.replace('0.6', '0.3')}`,
+                        letterSpacing: '0.5px'
+                      }}>
+                        {lastCorrectAnswer}: {getOptionTextForAnswer(lastWrongQuestion, lastCorrectAnswer)}
+                      </div>
                     </div>
-                    <div style={{
-                      fontSize: '1.6rem',
-                      fontWeight: '700',
-                      textAlign: 'center',
-                      color: '#ec4899',
-                      textShadow: `0 0 20px rgba(236, 72, 153, 0.8), 0 0 40px rgba(236, 72, 153, 0.5)`,
-                      letterSpacing: '0.5px'
-                    }}>
-                      {lastCorrectAnswer}: {getOptionTextForAnswer(lastWrongQuestion, lastCorrectAnswer)}
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
                 
                 <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>
                   {t.splashStartPrompt}

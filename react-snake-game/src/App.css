@@ -180,7 +180,7 @@ canvas {
 .splash {
   position: absolute;
   z-index: 3;
-  top: 50%;
+  top: 60%;
   left: 50%;
   transform: translate(-50%, -50%);
   width: 410px;
