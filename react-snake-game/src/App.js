@@ -943,13 +943,17 @@ function App() {
           
           if (correctWorm) {
             setLastCorrectAnswer({
+              question: currentQuestion.question,
               label: correctWorm.label,
               text: result.correctAnswer.text,
               color: correctWorm.color
             });
           } else {
             // Fallback to server's label if we can't find the worm
-            setLastCorrectAnswer(result.correctAnswer);
+            setLastCorrectAnswer({
+              question: currentQuestion.question,
+              ...result.correctAnswer
+            });
           }
         }
         setAssessmentSession(null);
@@ -963,7 +967,7 @@ function App() {
       setAssessmentSession(null);
       endGame();
     }
-  }, [assessmentSession, isPracticeMode, user, currentBank, endGame]);
+  }, [assessmentSession, isPracticeMode, user, currentBank, currentQuestion, endGame]);
 
   // Main game loop with tempo-safe two-stage input buffer
   useEffect(() => {
@@ -1578,6 +1582,17 @@ function App() {
                     boxShadow: `0 0 20px ${lastCorrectAnswer.color ? lastCorrectAnswer.color + '50' : 'rgba(129, 255, 129, 0.3)'}`,
                     animation: 'pulse 2s ease-in-out infinite'
                   }}>
+                    {lastCorrectAnswer.question && (
+                      <div style={{ 
+                        fontSize: '0.9rem', 
+                        color: '#ffffff', 
+                        marginBottom: '8px',
+                        fontWeight: '400',
+                        lineHeight: '1.4'
+                      }}>
+                        {lastCorrectAnswer.question}
+                      </div>
+                    )}
                     <div style={{ 
                       fontSize: '1rem', 
                       color: '#ffe082', 
