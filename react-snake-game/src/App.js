@@ -6,6 +6,7 @@ import LoginPage from './LoginPage';
 import UserPanel from './UserPanel';
 import QuestionBankSelector from './QuestionBankSelector';
 import PracticeModePopup from './PracticeModePopup';
+import { startAssessment, submitAttempt, retryWithBackoff } from './api';
 
 const GRID_SIZE = 24;
 const CANVAS_WIDTH = 900;
@@ -105,6 +106,61 @@ const generateWormsForQuestion = (question, snake) => {
   }));
 };
 
+// Generate worms for assessed mode (server-authoritative)
+// Options already have labels from server, we just map to positions
+const generateWormsForAssessment = (assessmentOptions, snake) => {
+  const positions = [];
+  const minHeadDistance = 5;
+  const minWormDistance = 3;
+  const edgeBuffer = 1;
+  const maxAttempts = 4000;
+  let attempts = 0;
+  const head = snake[0];
+
+  const distance = (ax, ay, bx, by) => {
+    return Math.abs(ax - bx) + Math.abs(ay - by);
+  };
+
+  while (positions.length < 4 && attempts < maxAttempts) {
+    const gx = edgeBuffer + Math.floor(Math.random() * (GRID_W - 2 * edgeBuffer));
+    const gy = RESERVED_ROWS + edgeBuffer + Math.floor(Math.random() * (GRID_H - RESERVED_ROWS - 2 * edgeBuffer));
+    const px = gx * GRID_SIZE;
+    const py = gy * GRID_SIZE;
+
+    const tooCloseToSnake = snake.some(seg => seg.x === px && seg.y === py);
+    const tooCloseToHead = distance(gx, gy, head.x / GRID_SIZE, head.y / GRID_SIZE) < minHeadDistance;
+    const tooCloseToOthers = positions.some(pos => distance(gx, gy, pos.gx, pos.gy) < minWormDistance);
+
+    if (!tooCloseToSnake && !tooCloseToHead && !tooCloseToOthers) {
+      positions.push({ x: px, y: py, gx, gy });
+    }
+    attempts++;
+  }
+
+  while (positions.length < 4) {
+    const gx = edgeBuffer + Math.floor(Math.random() * (GRID_W - 2 * edgeBuffer));
+    const gy = RESERVED_ROWS + edgeBuffer + Math.floor(Math.random() * (GRID_H - RESERVED_ROWS - 2 * edgeBuffer));
+    const px = gx * GRID_SIZE;
+    const py = gy * GRID_SIZE;
+
+    if (!positions.some(pos => pos.x === px && pos.y === py)) {
+      positions.push({ x: px, y: py, gx, gy });
+    }
+  }
+
+  // Map assessment options to worms
+  // In assessed mode, we don't know which is correct, so isCorrect is always false
+  // We store optionId for server validation
+  return assessmentOptions.map((option, i) => ({
+    x: positions[i].x,
+    y: positions[i].y,
+    label: option.label,
+    optionId: option.optionId, // Store for server validation
+    isCorrect: false, // Unknown in assessed mode - will be validated server-side
+    color: getColor()
+  }));
+};
+
 function App() {
   // Language state
   const [language, setLanguage] = useState('en');
@@ -135,11 +191,11 @@ function App() {
   const [isGameRunning, setIsGameRunning] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [level, setLevel] = useState(1);
-  const [usedQuestions, setUsedQuestions] = useState([]);
-  const [startTime, setStartTime] = useState(null);
+  const [usedQuestions, setUsedQuestions] = useState([]); // eslint-disable-line no-unused-vars
+  const [startTime, setStartTime] = useState(null); // eslint-disable-line no-unused-vars
   const [gameTime, setGameTime] = useState(0);
-  const [awaitingInitialMove, setAwaitingInitialMove] = useState(true);
-  const [isSlow, setIsSlow] = useState(false);
+  const [awaitingInitialMove, setAwaitingInitialMove] = useState(true); // eslint-disable-line no-unused-vars
+  const [isSlow, setIsSlow] = useState(false); // eslint-disable-line no-unused-vars
   const [showSplash, setShowSplash] = useState(true);
   const [showNextLevel, setShowNextLevel] = useState(false);
   const [questionAnimationClass, setQuestionAnimationClass] = useState('fade-in');
@@ -151,6 +207,11 @@ function App() {
   const [performanceHistory, setPerformanceHistory] = useState([]);
   const [currentGameStart, setCurrentGameStart] = useState(null);
   const [lastMoveTime, setLastMoveTime] = useState(null);
+
+  // Assessed mode state (server-authoritative)
+  const [isAssessedMode, setIsAssessedMode] = useState(false); // eslint-disable-line no-unused-vars
+  const [assessmentSession, setAssessmentSession] = useState(null); // { itemId, seq, isVerifying }
+  const [verificationError, setVerificationError] = useState(null); // eslint-disable-line no-unused-vars
 
   // Canvas & images
   const canvasRef = useRef(null);
@@ -184,6 +245,7 @@ function App() {
   const isSlowRef = useRef(false);
   const levelRef = useRef(1);
   const usedQuestionsRef = useRef([]);
+  const isVerifyingRef = useRef(false); // Track if we're waiting for server validation
 
   // Preload tuna images and background
   useEffect(() => {
@@ -783,6 +845,109 @@ function App() {
     return strugglingCount >= 2;
   };
 
+  // Handle collision in assessed mode (async server validation)
+  const handleAssessedModeCollision = useCallback(async (worm, newSnake) => {
+    if (!assessmentSession || !worm.optionId) {
+      console.error('Assessment session or optionId missing');
+      endGame();
+      return;
+    }
+
+    // Trigger slow-mo effect immediately to hide RTT
+    isSlowRef.current = true;
+    setIsSlow(true);
+
+    // Mark that we're verifying
+    isVerifyingRef.current = true;
+    setAssessmentSession(prev => ({ ...prev, isVerifying: true }));
+
+    try {
+      // Call server with retry
+      const result = await retryWithBackoff(async () => {
+        return await submitAttempt(
+          assessmentSession.itemId,
+          worm.optionId,
+          assessmentSession.seq
+        );
+      });
+
+      // Handle result
+      if (result.correct) {
+        // Level up
+        levelRef.current = (levelRef.current || 1) + 1;
+        setLevel(levelRef.current);
+
+        // Leaderboard (non practice)
+        if (!isPracticeMode && user) {
+          const newEntry = {
+            name: user.username,
+            level: levelRef.current,
+            time: startTimeRef.current ? ((Date.now() - startTimeRef.current) / 1000).toFixed(2) : 0,
+            folder: currentBank
+          };
+          setLeaderboard(prev => {
+            const idx = prev.findIndex(e => e.name === user.username);
+            const updated = idx !== -1 ? Object.assign([...prev], { [idx]: newEntry }) : [...prev, newEntry];
+            updated.sort((a, b) => b.level - a.level || a.time - b.time);
+            fetch('/api/leaderboard', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newEntry)
+            }).catch(err => console.error('Failed to save score:', err));
+            return updated;
+          });
+        }
+
+        // Commit snake
+        snakeRef.current = newSnake;
+
+        // Next question
+        if (result.nextItem) {
+          setAssessmentSession({
+            itemId: result.nextItem.itemId,
+            seq: result.nextItem.seq,
+            isVerifying: false
+          });
+
+          setCurrentQuestion({ 
+            question: result.nextItem.question, 
+            options: result.nextItem.options.map(o => o.text) 
+          });
+
+          const newWorms = generateWormsForAssessment(result.nextItem.options, newSnake);
+          wormsRef.current = newWorms;
+          setWorms(newWorms);
+
+          const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
+          setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
+        } else {
+          // Assessment complete
+          setAssessmentSession(null);
+        }
+
+        // End slow-mo after delay
+        setTimeout(() => {
+          isSlowRef.current = false;
+          setIsSlow(false);
+          isVerifyingRef.current = false;
+        }, 2000);
+
+      } else {
+        // Wrong answer - end game
+        isVerifyingRef.current = false;
+        setAssessmentSession(null);
+        endGame();
+      }
+
+    } catch (error) {
+      console.error('Failed to verify answer:', error);
+      isVerifyingRef.current = false;
+      setVerificationError('Failed to verify answer. Ending game.');
+      setAssessmentSession(null);
+      endGame();
+    }
+  }, [assessmentSession, isPracticeMode, user, currentBank, endGame]);
+
   // Main game loop with tempo-safe two-stage input buffer
   useEffect(() => {
     if (!isGameRunning) return;
@@ -792,6 +957,11 @@ function App() {
 
     // One-tick move, returns false if died
     const moveSnakeOnce = () => {
+      // Don't move if we're waiting for server validation
+      if (isVerifyingRef.current) {
+        return true;
+      }
+      
       // Apply the next scheduled direction; keep moving in that direction
       const d = nextDirRef.current;
       directionRef.current = d;
@@ -806,6 +976,20 @@ function App() {
       const eatenIdx = (wormsRef.current || []).findIndex(w => w.x === head.x && w.y === head.y);
       if (eatenIdx !== -1) {
         const worm = wormsRef.current[eatenIdx];
+        
+        // Assessed mode: async server validation
+        if (isAssessedMode) {
+          // Don't continue moving while verifying
+          if (isVerifyingRef.current) {
+            return true; // Keep game running but paused
+          }
+          
+          // Trigger async validation
+          handleAssessedModeCollision(worm, newSnake);
+          return true; // Game continues, validation happens async
+        }
+        
+        // Practice mode: client-side validation
         if (worm.isCorrect) {
           // Level up
           levelRef.current = (levelRef.current || 1) + 1;
@@ -954,9 +1138,74 @@ function App() {
       clearInterval(logicIntervalId);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [isGameRunning, isPracticeMode, drawGame, endGame, questions]);
+  }, [isGameRunning, isPracticeMode, drawGame, endGame, questions, isAssessedMode, handleAssessedModeCollision, user, currentBank]);
 
-  const startGame = useCallback(() => {
+  const startGame = useCallback(async () => {
+    // For assessed mode, fetch from server
+    if (isAssessedMode && user) {
+      try {
+        // Reset explosion state
+        isExplodingRef.current = false;
+
+        // Initialize refs
+        const initialSnake = [
+          { x: GRID_SIZE * 4, y: GRID_SIZE * 8 },
+          { x: GRID_SIZE * 3, y: GRID_SIZE * 8 },
+          { x: GRID_SIZE * 2, y: GRID_SIZE * 8 }
+        ];
+        snakeRef.current = initialSnake;
+        directionRef.current = { x: 0, y: 0 };
+        nextDirRef.current = { x: 0, y: 0 };
+        pendingDirRef.current = null;
+        awaitingInitialMoveRef.current = true;
+        isSlowRef.current = false;
+        levelRef.current = 1;
+        startTimeRef.current = null;
+
+        // UI state
+        setIsGameOver(false);
+        setLevel(1);
+        setUsedQuestions([]);
+        setStartTime(null);
+        setCurrentGameStart(Date.now());
+        setLastMoveTime(null);
+        lastStepTimeRef.current = 0;
+        setAwaitingInitialMove(true);
+        setShowSplash(false);
+        setShowNextLevel(false);
+        setShowPracticeModePopup(false);
+        setVerificationError(null);
+
+        // Start assessment session
+        const data = await startAssessment(currentBank);
+        
+        // Store assessment session state
+        setAssessmentSession({
+          itemId: data.itemId,
+          seq: data.seq,
+          isVerifying: false
+        });
+
+        // Set question (without answer field)
+        setCurrentQuestion({ question: data.question, options: data.options.map(o => o.text) });
+
+        // Generate worms with optionIds
+        const newWorms = generateWormsForAssessment(data.options, initialSnake);
+        wormsRef.current = newWorms;
+        setWorms(newWorms);
+
+        const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
+        setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
+
+        setIsGameRunning(true);
+      } catch (error) {
+        console.error('Failed to start assessment:', error);
+        setVerificationError('Failed to start assessment. Please try again.');
+      }
+      return;
+    }
+
+    // Practice mode (existing logic)
     if (!questions || questions.length === 0) {
       console.error('No questions available');
       return;
@@ -1011,7 +1260,7 @@ function App() {
     setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
 
     setIsGameRunning(true);
-  }, [questions]);
+  }, [questions, isAssessedMode, user, currentBank]);
 
   const handlePracticeModeAccept = (dontShowAgain) => {
     setIsPracticeMode(true);
