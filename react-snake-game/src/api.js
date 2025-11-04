@@ -31,18 +31,18 @@ export async function startAssessment(folder) {
 /**
  * Submit an answer attempt
  * @param {string} itemId - The question item ID
- * @param {string} optionId - The selected option ID
+ * @param {string} selectedLabel - The selected answer label (A, B, C, or D)
  * @param {number} seq - The sequence number
- * @returns {Promise<{correct: boolean, nextItem?: {itemId, question, options, seq}}>}
+ * @returns {Promise<{correct: boolean, nextItem?: {itemId, question, options, seq}, correctAnswer?: {label, text}}>}
  */
-export async function submitAttempt(itemId, optionId, seq) {
+export async function submitAttempt(itemId, selectedLabel, seq) {
   const response = await fetch(`${API_BASE}/api/assessments/attempt`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     credentials: 'include',
-    body: JSON.stringify({ itemId, optionId, seq })
+    body: JSON.stringify({ itemId, selectedLabel, seq })
   });
   
   if (!response.ok) {

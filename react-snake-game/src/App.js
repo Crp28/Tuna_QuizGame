@@ -153,12 +153,11 @@ const generateWormsForAssessment = (assessmentOptions, snake) => {
 
   // Map assessment options to worms
   // In assessed mode, we don't know which is correct, so isCorrect is always false
-  // We store optionId for server validation
+  // We store label for server validation
   return assessmentOptions.map((option, i) => ({
     x: positions[i].x,
     y: positions[i].y,
     label: option.label,
-    optionId: option.optionId, // Store for server validation
     isCorrect: false, // Unknown in assessed mode - will be validated server-side
     color: getColor()
   }));
@@ -891,8 +890,8 @@ function App() {
 
   // Handle collision in assessed mode (async server validation)
   const handleAssessedModeCollision = useCallback(async (worm, newSnake) => {
-    if (!assessmentSession || !worm.optionId) {
-      console.error('Assessment session or optionId missing');
+    if (!assessmentSession || !worm.label) {
+      console.error('Assessment session or worm label missing');
       endGame();
       return;
     }
@@ -910,7 +909,7 @@ function App() {
       const result = await retryWithBackoff(async () => {
         return await submitAttempt(
           assessmentSession.itemId,
-          worm.optionId,
+          worm.label,
           assessmentSession.seq
         );
       });

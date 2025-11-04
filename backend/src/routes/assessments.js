@@ -48,7 +48,7 @@ router.post('/start', requireAuth, async (req, res) => {
     // Shuffle questions to create a queue
     const shuffledQuestions = [...questions].sort(() => Math.random() - 0.5);
     
-    // Generate assessment items with shuffled options and opaque IDs
+    // Generate assessment items with shuffled options
     const assessmentQueue = shuffledQuestions.map((q, qIdx) => {
       const itemId = crypto.randomUUID();
       
@@ -63,26 +63,24 @@ router.post('/start', requireAuth, async (req, res) => {
       // Shuffle the options
       const shuffledOptions = [...optionsWithLabels].sort(() => Math.random() - 0.5);
       
-      // Create opaque option IDs
-      const options = shuffledOptions.map(opt => ({
-        optionId: crypto.randomUUID(),
-        label: opt.label,
+      // Reassign labels A, B, C, D based on shuffled positions
+      const options = shuffledOptions.map((opt, idx) => ({
+        label: labels[idx],  // New label based on position after shuffle
         text: opt.text,
-        originalLabel: opt.originalLabel
+        originalLabel: opt.originalLabel  // Keep track of original for validation
       }));
       
-      // Find correct option ID based on original answer
+      // Find the correct answer's original label to determine which new label is correct
       const correctOption = options.find(opt => opt.originalLabel === q.answer);
       
       return {
         itemId,
         question: q.question,
         options: options.map(opt => ({
-          optionId: opt.optionId,
           label: opt.label,
           text: opt.text
         })),
-        correctOptionId: correctOption.optionId
+        correctLabel: correctOption.label  // Store which label (A/B/C/D) is correct after shuffle
       };
     });
     
@@ -93,7 +91,7 @@ router.post('/start', requireAuth, async (req, res) => {
       index: 0,
       seq: 0,
       mapping: assessmentQueue.reduce((acc, item) => {
-        acc[item.itemId] = item.correctOptionId;
+        acc[item.itemId] = item.correctLabel;
         return acc;
       }, {})
     };
@@ -119,18 +117,18 @@ router.post('/start', requireAuth, async (req, res) => {
 /**
  * POST /api/assessments/attempt
  * Submit an answer and get validation result
- * Body: { itemId, optionId, seq }
- * Returns: { correct: boolean, nextItem?: { itemId, question, options, seq } }
+ * Body: { itemId, selectedLabel, seq }
+ * Returns: { correct: boolean, nextItem?: { itemId, question, options, seq }, correctAnswer?: { label, text } }
  */
 router.post('/attempt', requireAuth, async (req, res) => {
   try {
-    const { itemId, optionId, seq } = req.body;
+    const { itemId, selectedLabel, seq } = req.body;
     
     // Validation
-    if (!itemId || !optionId || typeof seq !== 'number') {
+    if (!itemId || !selectedLabel || typeof seq !== 'number') {
       return res.status(400).json({ 
         success: false, 
-        error: 'itemId, optionId, and seq are required' 
+        error: 'itemId, selectedLabel, and seq are required' 
       });
     }
     
@@ -162,16 +160,15 @@ router.post('/attempt', requireAuth, async (req, res) => {
     }
     
     // Check correctness
-    const correctOptionId = assessment.mapping[itemId];
-    const isCorrect = optionId === correctOptionId;
+    const correctLabel = assessment.mapping[itemId];
+    const isCorrect = selectedLabel === correctLabel;
     
     // Find the correct option details (label and text) for wrong answers
     let correctAnswerInfo = null;
     if (!isCorrect) {
-      const correctOption = currentItem.options.find(opt => opt.optionId === correctOptionId);
+      const correctOption = currentItem.options.find(opt => opt.label === correctLabel);
       if (correctOption) {
         correctAnswerInfo = {
-          optionId: correctOption.optionId,
           label: correctOption.label,
           text: correctOption.text
         };
@@ -221,7 +218,7 @@ router.post('/attempt', requireAuth, async (req, res) => {
  * POST /api/assessments/reveal
  * Get the correct answer for the current question when game ends (border/self collision)
  * Body: { itemId, seq }
- * Returns: { correctAnswer: { optionId, label, text } }
+ * Returns: { correctAnswer: { label, text } }
  */
 router.post('/reveal', requireAuth, async (req, res) => {
   try {
@@ -263,8 +260,8 @@ router.post('/reveal', requireAuth, async (req, res) => {
     }
     
     // Get correct option
-    const correctOptionId = assessment.mapping[itemId];
-    const correctOption = currentItem.options.find(opt => opt.optionId === correctOptionId);
+    const correctLabel = assessment.mapping[itemId];
+    const correctOption = currentItem.options.find(opt => opt.label === correctLabel);
     
     if (!correctOption) {
       return res.status(500).json({ 
@@ -279,7 +276,6 @@ router.post('/reveal', requireAuth, async (req, res) => {
     // Return correct answer
     res.json({
       correctAnswer: {
-        optionId: correctOption.optionId,
         label: correctOption.label,
         text: correctOption.text
       }
