@@ -11,6 +11,7 @@ const questionsRouter = require('./routes/questions');
 const leaderboardRouter = require('./routes/leaderboard');
 const authRouter = require('./routes/auth');
 const questionBanksRouter = require('./routes/questionBanks');
+const assessmentsRouter = require('./routes/assessments');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -65,6 +66,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/questions', questionsRouter);
 app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/question-banks', questionBanksRouter);
+app.use('/api/assessments', assessmentsRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
