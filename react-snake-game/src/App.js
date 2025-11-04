@@ -20,6 +20,9 @@ const MIN_STEP_DELAY = 105;
 
 // Utility functions
 
+// Check if direction is unset (no movement)
+const isDirectionUnset = (dir) => dir.x === 0 && dir.y === 0;
+
 const getColor = (() => {
   const hues = [310, 200, 64, 135];
   let index = 0;
@@ -246,6 +249,14 @@ function App() {
   const levelRef = useRef(1);
   const usedQuestionsRef = useRef([]);
   const isVerifyingRef = useRef(false); // Track if we're waiting for server validation
+
+  // Helper function to clear the awaiting initial move flag
+  const clearAwaitingInitialMove = useCallback(() => {
+    if (awaitingInitialMoveRef.current) {
+      awaitingInitialMoveRef.current = false;
+      setAwaitingInitialMove(false);
+    }
+  }, []);
 
   // Preload tuna images and background
   useEffect(() => {
@@ -1008,7 +1019,7 @@ function App() {
       // Apply the next scheduled direction; keep moving in that direction
       const d = nextDirRef.current;
       directionRef.current = d;
-      if (d.x === 0 && d.y === 0) return true; // idle before first move
+      if (isDirectionUnset(d)) return true; // idle before first move
 
       const head = {
         x: snakeRef.current[0].x + d.x,
@@ -1027,10 +1038,7 @@ function App() {
         }
         
         // Clear awaiting initial move flag if this is the first move
-        if (awaitingInitialMoveRef.current) {
-          awaitingInitialMoveRef.current = false;
-          setAwaitingInitialMove(false);
-        }
+        clearAwaitingInitialMove();
         
         // Set verification flag BEFORE async call to prevent duplicate collision detection
         isVerifyingRef.current = true;
@@ -1044,10 +1052,7 @@ function App() {
         snakeRef.current = newSnake;
 
         // Clear awaiting initial move flag after first successful move
-        if (awaitingInitialMoveRef.current) {
-          awaitingInitialMoveRef.current = false;
-          setAwaitingInitialMove(false);
-        }
+        clearAwaitingInitialMove();
 
         // After a successful move, promote pending turn (if valid vs new direction)
         if (pendingDirRef.current) {
@@ -1091,7 +1096,7 @@ function App() {
       }
 
       // Awaiting initial move (keep drawing, no movement yet)
-      if (awaitingInitialMoveRef.current && (nextDirRef.current.x === 0 && nextDirRef.current.y === 0)) {
+      if (awaitingInitialMoveRef.current && isDirectionUnset(nextDirRef.current)) {
         return;
       }
 
@@ -1120,7 +1125,7 @@ function App() {
       clearInterval(logicIntervalId);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [isGameRunning, isPracticeMode, drawGame, endGame, handleAssessedModeCollision, handleBorderSelfCollision, user, currentBank]);
+  }, [isGameRunning, isPracticeMode, drawGame, endGame, handleAssessedModeCollision, handleBorderSelfCollision, user, currentBank, clearAwaitingInitialMove]);
 
   const startGame = useCallback(async () => {
     // Always use assessed mode with server-authoritative validation
@@ -1247,7 +1252,7 @@ function App() {
       // First valid input: start rhythm from this press (snake.js)
       if (awaitingInitialMoveRef.current) {
         // Only accept input if we haven't already set a direction
-        if (nextDirRef.current.x === 0 && nextDirRef.current.y === 0) {
+        if (isDirectionUnset(nextDirRef.current)) {
           if (!isOpposite(newDir, eff)) {
             nextDirRef.current = newDir;
             const now = Date.now();
