@@ -40,71 +40,9 @@ const getWaterColor = () => {
   return `hsl(${h},${s}%,${l}%)`;
 };
 
-const getRandomQuestion = (questions, usedQuestions) => {
-  if (!questions || questions.length === 0) {
-    console.error('No questions available');
-    return { question: null, usedQuestions: [] };
-  }
-  if (usedQuestions.length >= questions.length) {
-    usedQuestions = [];
-  }
-  let idx;
-  do {
-    idx = Math.floor(Math.random() * questions.length);
-  } while (usedQuestions.includes(idx));
-  usedQuestions.push(idx);
-  return { question: questions[idx], usedQuestions };
-};
 
-const generateWormsForQuestion = (question, snake) => {
-  const labels = ["A", "B", "C", "D"];
-  const positions = [];
-  const minHeadDistance = 5;
-  const minWormDistance = 3;
-  const edgeBuffer = 1;
-  const maxAttempts = 4000;
-  let attempts = 0;
-  const head = snake[0];
 
-  const distance = (ax, ay, bx, by) => {
-    return Math.abs(ax - bx) + Math.abs(ay - by);
-  };
 
-  while (positions.length < 4 && attempts < maxAttempts) {
-    const gx = edgeBuffer + Math.floor(Math.random() * (GRID_W - 2 * edgeBuffer));
-    const gy = RESERVED_ROWS + edgeBuffer + Math.floor(Math.random() * (GRID_H - RESERVED_ROWS - 2 * edgeBuffer));
-    const px = gx * GRID_SIZE;
-    const py = gy * GRID_SIZE;
-
-    const tooCloseToSnake = snake.some(seg => seg.x === px && seg.y === py);
-    const tooCloseToHead = distance(gx, gy, head.x / GRID_SIZE, head.y / GRID_SIZE) < minHeadDistance;
-    const tooCloseToOthers = positions.some(pos => distance(gx, gy, pos.gx, pos.gy) < minWormDistance);
-
-    if (!tooCloseToSnake && !tooCloseToHead && !tooCloseToOthers) {
-      positions.push({ x: px, y: py, gx, gy });
-    }
-    attempts++;
-  }
-
-  while (positions.length < 4) {
-    const gx = edgeBuffer + Math.floor(Math.random() * (GRID_W - 2 * edgeBuffer));
-    const gy = RESERVED_ROWS + edgeBuffer + Math.floor(Math.random() * (GRID_H - RESERVED_ROWS - 2 * edgeBuffer));
-    const px = gx * GRID_SIZE;
-    const py = gy * GRID_SIZE;
-
-    if (!positions.some(pos => pos.x === px && pos.y === py)) {
-      positions.push({ x: px, y: py, gx, gy });
-    }
-  }
-
-  return labels.map((label, i) => ({
-    x: positions[i].x,
-    y: positions[i].y,
-    label,
-    isCorrect: question && question.answer ? label === question.answer : false,
-    color: getColor()
-  }));
-};
 
 // Generate worms for assessed mode (server-authoritative)
 // Options already have labels from server, we just map to positions
@@ -332,28 +270,6 @@ function App() {
     loadQuestions();
     loadLeaderboard();
   }, [user, currentBank]);
-
-  // Initialize first question
-  useEffect(() => {
-    // Skip if in assessed mode - worms are managed by assessment flow
-    if (assessmentSession) {
-      return;
-    }
-    
-    if (questions.length > 0 && !currentQuestion) {
-      const { question, usedQuestions: newUsed } = getRandomQuestion(questions, usedQuestionsRef.current || []);
-      setCurrentQuestion(question);
-      usedQuestionsRef.current = newUsed;
-      setUsedQuestions(newUsed);
-
-      const newWorms = generateWormsForQuestion(question, snakeRef.current);
-      wormsRef.current = newWorms;
-      setWorms(newWorms);
-
-      const animations = ["fade-in", "zoom-in", "slide-left", "bounce-in"];
-      setQuestionAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
-    }
-  }, [questions, currentQuestion, assessmentSession]);
 
   // Water splash explosion animation loop - Maori ocean theme
   const explosionLoop = useCallback(() => {
@@ -1258,7 +1174,8 @@ function App() {
           startTimeRef.current = now;
           setStartTime(now);
           lastStepTimeRef.current = now;
-          directionRef.current = newDir; // visual orientation
+          // Don't set directionRef.current here - let game loop set it on first actual move
+          // This prevents suicide bug from multiple quick inputs before first tick
           setLastMoveTime(now);
         }
         return;
