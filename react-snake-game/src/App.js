@@ -698,30 +698,41 @@ function App() {
 
   // End game callback (reads refs)
   const endGame = useCallback(() => {
+    // Prevent multiple calls
+    if (!isGameRunning) return;
+    
     setIsGameRunning(false);
     setIsGameOver(true);
 
-    // Trigger explosion animation
-    isExplodingRef.current = true;
-    explosionStartRef.current = Date.now();
-    shakeStartRef.current = Date.now();
+    // Store current question for display on death screen (for all death types)
+    if (currentQuestion) {
+      setLastWrongQuestion(currentQuestion);
+      // We don't know the correct answer yet for border/self collision, so we'll handle it differently
+    }
 
-    explosionSegmentsRef.current = snakeRef.current.map((seg, idx) => {
-      let angle = Math.random() * Math.PI * 2;
-      let speed = 6 + Math.random() * 7; // Slightly slower for water effect
-      let segColor = getWaterColor();
-      if (idx === 0) segColor = "#00e5ff"; // Bright cyan for head (water splash)
-      return {
-        ...seg,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 2, // Initial upward motion for splash
-        alpha: 1,
-        color: segColor,
-        trail: [{ x: seg.x, y: seg.y, alpha: 1 }]
-      };
-    });
+    // Trigger explosion animation only if not already exploding
+    if (!isExplodingRef.current) {
+      isExplodingRef.current = true;
+      explosionStartRef.current = Date.now();
+      shakeStartRef.current = Date.now();
 
-    requestAnimationFrame(explosionLoop);
+      explosionSegmentsRef.current = snakeRef.current.map((seg, idx) => {
+        let angle = Math.random() * Math.PI * 2;
+        let speed = 6 + Math.random() * 7; // Slightly slower for water effect
+        let segColor = getWaterColor();
+        if (idx === 0) segColor = "#00e5ff"; // Bright cyan for head (water splash)
+        return {
+          ...seg,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 2, // Initial upward motion for splash
+          alpha: 1,
+          color: segColor,
+          trail: [{ x: seg.x, y: seg.y, alpha: 1 }]
+        };
+      });
+
+      requestAnimationFrame(explosionLoop);
+    }
 
     // Practice mode detection (unchanged logic, adapted to refs where needed)
     if (!isPracticeMode && currentGameStart) {
@@ -777,7 +788,7 @@ function App() {
       setShowSplash(true);
       isExplodingRef.current = false; // Allow input after splash is shown
     }, 1100);
-  }, [user, currentGameStart, lastMoveTime, performanceHistory, practiceModeDisabled, isPracticeMode, currentBank, explosionLoop]);
+  }, [user, currentGameStart, lastMoveTime, performanceHistory, practiceModeDisabled, isPracticeMode, currentBank, explosionLoop, currentQuestion, isGameRunning]);
 
   const detectStrugglingPlayer = (recentGames) => {
     let strugglingCount = 0;
@@ -978,6 +989,31 @@ function App() {
         
         if (!moveResult) return;
         if (checkCollision()) {
+          // Store current question for death screen display
+          if (currentQuestion) {
+            setLastWrongQuestion(currentQuestion);
+            // For border/self collision, we need to get the correct answer from the backend
+            // We'll use the current question index to fetch it
+            if (currentQuestionIndexRef.current !== null) {
+              fetch('/api/questions/check-answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                  folder: currentBank,
+                  questionIndex: currentQuestionIndexRef.current,
+                  selectedAnswer: 'A' // Dummy value, we just want the correct answer
+                })
+              })
+              .then(res => res.json())
+              .then(result => {
+                if (result.correctAnswer) {
+                  setLastCorrectAnswer(result.correctAnswer);
+                }
+              })
+              .catch(err => console.error('Failed to fetch correct answer:', err));
+            }
+          }
           endGame();
           return;
         }
@@ -1112,19 +1148,22 @@ function App() {
 
       // First valid input: start rhythm from this press (snake.js)
       if (awaitingInitialMoveRef.current) {
-        if (!isOpposite(newDir, eff)) {
-          nextDirRef.current = newDir;
-          // Don't set awaitingInitialMoveRef to false here!
-          // It will be set to false after the first move executes in gameLogicLoop
-          const now = Date.now();
-          startTimeRef.current = now;
-          lastStepTimeRef.current = now;
-          directionRef.current = newDir; // visual orientation
-          setLastMoveTime(now);
-          // Clear any pending direction to prevent suicide from multiple quick inputs
-          pendingDirRef.current = null;
+        // Only accept input if we haven't already set a direction
+        if (nextDirRef.current.x === 0 && nextDirRef.current.y === 0) {
+          if (!isOpposite(newDir, eff)) {
+            nextDirRef.current = newDir;
+            // Don't set awaitingInitialMoveRef to false here!
+            // It will be set to false after the first move executes in gameLogicLoop
+            const now = Date.now();
+            startTimeRef.current = now;
+            lastStepTimeRef.current = now;
+            directionRef.current = newDir; // visual orientation
+            setLastMoveTime(now);
+            // Clear any pending direction to prevent suicide from multiple quick inputs
+            pendingDirRef.current = null;
+          }
         }
-        // IMPORTANT: Return here regardless of whether input was valid or not
+        // IMPORTANT: Return here regardless of whether input was accepted or not
         // This ensures we ignore ALL inputs until the first move actually executes
         return;
       }
@@ -1474,56 +1513,35 @@ function App() {
                   {isGameOver ? `${t.splashPlayAgain} ${user.name}?` : `${t.splashReady} ${user.name}?`}
                 </div>
                 
-                {/* Show the question and correct answer if player died from wrong answer */}
+                {/* Show the question and correct answer on death */}
                 {isGameOver && lastWrongQuestion && lastCorrectAnswer && (
                   <div style={{
-                    background: 'linear-gradient(135deg, rgba(255, 87, 34, 0.15) 0%, rgba(244, 67, 54, 0.15) 100%)',
-                    border: '2px solid rgba(255, 87, 34, 0.5)',
-                    borderRadius: '16px',
-                    padding: '20px',
+                    background: 'rgba(30, 41, 59, 0.95)',
+                    border: '3px solid #ec4899',
+                    borderRadius: '12px',
+                    padding: '20px 24px',
                     marginBottom: '20px',
-                    boxShadow: '0 4px 20px rgba(255, 87, 34, 0.3)',
+                    boxShadow: `0 0 30px rgba(236, 72, 153, 0.6), 0 0 60px rgba(236, 72, 153, 0.3)`,
+                    maxWidth: '90%'
                   }}>
                     <div style={{
-                      fontSize: '1.4rem',
-                      fontWeight: '700',
+                      fontSize: '0.9rem',
                       marginBottom: '12px',
-                      color: '#ff5722',
-                      textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                      color: '#e2e8f0',
+                      lineHeight: '1.4',
+                      textAlign: 'center'
                     }}>
-                      💀 You Got This Wrong:
+                      {lastWrongQuestion.question}
                     </div>
                     <div style={{
-                      fontSize: '1.1rem',
-                      marginBottom: '15px',
-                      color: '#fff',
-                      lineHeight: '1.5',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      borderLeft: '4px solid #ff5722'
+                      fontSize: '1.6rem',
+                      fontWeight: '700',
+                      textAlign: 'center',
+                      color: '#ec4899',
+                      textShadow: `0 0 20px rgba(236, 72, 153, 0.8), 0 0 40px rgba(236, 72, 153, 0.5)`,
+                      letterSpacing: '0.5px'
                     }}>
-                      <strong>Q:</strong> {lastWrongQuestion.question}
-                    </div>
-                    <div style={{
-                      fontSize: '1.15rem',
-                      fontWeight: '600',
-                      padding: '12px',
-                      background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.3) 0%, rgba(139, 195, 74, 0.3) 100%)',
-                      borderRadius: '10px',
-                      color: '#81ff81',
-                      textShadow: '0 2px 4px rgba(0,0,0,0.4)',
-                      border: '2px solid rgba(129, 255, 129, 0.5)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px'
-                    }}>
-                      <span style={{ fontSize: '1.5rem' }}>✅</span>
-                      <span>
-                        <strong>Correct Answer:</strong> {lastCorrectAnswer}
-                        {getOptionTextForAnswer(lastWrongQuestion, lastCorrectAnswer) && 
-                          ` - ${getOptionTextForAnswer(lastWrongQuestion, lastCorrectAnswer)}`}
-                      </span>
+                      {lastCorrectAnswer}: {getOptionTextForAnswer(lastWrongQuestion, lastCorrectAnswer)}
                     </div>
                   </div>
                 )}
