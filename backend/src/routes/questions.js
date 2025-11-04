@@ -3,6 +3,19 @@ const router = express.Router();
 const db = require('../config/database');
 
 /**
+ * Middleware to check if user is authenticated
+ */
+const requireAuth = (req, res, next) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ 
+      success: false, 
+      error: 'Authentication required' 
+    });
+  }
+  next();
+};
+
+/**
  * GET /api/questions
  * Query params: folder (optional, default: comp705-01)
  * Returns: Array of questions WITHOUT answer field (security improvement)
@@ -47,7 +60,7 @@ router.get('/', async (req, res) => {
  * Returns: { correct: boolean }
  * Verifies if the chosen answer is correct by checking against the database
  */
-router.post('/verify', async (req, res) => {
+router.post('/verify', requireAuth, async (req, res) => {
   try {
     const { questionText, chosenAnswer, folder } = req.body;
     
